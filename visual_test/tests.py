@@ -82,9 +82,16 @@ class YesNoStats:
 
 def attach_yesno_summary(logger, stats):
     if not logger.tests:
-        logger.end_test(test='unknown', aborted=True, abort_reason='no summary to attach to')
+        try:
+            logger.end_test(test='unknown', aborted=True, abort_reason='no summary to attach to')
+        except Exception:
+            pass
+        return
     logger.tests[-1].update(stats.summary())
-    logger.save()
+    try:
+        logger.save()
+    except Exception:
+        pass
 
 
 def record_abort(logger, name, exc, kind=None, **partial):
@@ -116,6 +123,14 @@ def wait_ms(win, ms):
     Note: Tkinter has no vsync; durations are approximate (expect ±10 ms
     jitter). For threshold work this is fine; do not use for TAC-grade
     temporal psychophysics without photodiode verification."""
+    try:
+        ms = float(ms)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"wait_ms requires a finite ms, got {ms!r}")
+    if not ms == ms or ms == float('inf') or ms == float('-inf'):
+        raise ValueError(f"wait_ms requires a finite ms, got {ms!r}")
+    if ms < 0:
+        raise ValueError(f"wait_ms requires ms >= 0, got {ms!r}")
     try:
         win.update()
     except Exception:
@@ -648,6 +663,7 @@ class StaticColorBullseye(Base):
     def trial(self, canvas, win, lvl, main):
         delta = 10 ** lvl
         if main and self.np_rng.random() < 0.15:
+            delta = 0.0
             cent_col, surr_col, truth = red_blue_pair(0, rng=self.np_rng)
             catch = True
         else:
@@ -700,13 +716,18 @@ class CollinearJudgment(Base):
         self.stats = YesNoStats()
 
     def trial(self, canvas, win, lvl, main):
-        offset_px = 10 ** lvl * self.ppd if lvl > -3 else 0.0
         if main and self.np_rng.random() < 0.2:
             offset_px, catch = 0.0, True
         else:
-            catch = False
+            raw_px = 10 ** lvl * self.ppd
             if not main:
-                offset_px = max(offset_px, 0.15 * self.ppd)
+                raw_px = max(raw_px, 0.15 * self.ppd)
+            if abs(raw_px) < 1.0:
+                self._clipped_levels = getattr(self, '_clipped_levels', [])
+                self._clipped_levels.append(round(float(lvl), 3))
+                raw_px = 1.0 if raw_px >= 0 else -1.0
+            offset_px = raw_px
+            catch = False
             if self.np_rng.random() < 0.5:
                 offset_px = -offset_px
         cx, cy = center(canvas)
@@ -952,7 +973,7 @@ class HueOrdering:
         _streak_reset(self)
         chips = hue_chips()
         lum = [0.299 * r + 0.587 * g + 0.114 * b for r, g, b in chips]
-        truth = sorted(range(6), key=lambda i: lum[i])
+        truth = sorted(range(6), key=lambda i: lum[i], reverse=True)
         chip_px = int(round(1.8 * self.ppd))
         spacing = int(round(2.3 * self.ppd))
         hit_r = int(round(1.0 * self.ppd))
@@ -1149,6 +1170,7 @@ class StaticReactionTime:
         rts, misses, fas = [], 0, 0
         cx, cy = center(canvas)
         px = int(round(2.8 * self.ppd))
+        trial_no = 0
         try:
             for t in range(self.n_trials):
                 while True:
@@ -1186,6 +1208,11 @@ class StaticReactionTime:
                         raise QuitExperiment("Participant pressed Escape")
                     if early:
                         fas += 1
+                        trial_no += 1
+                        self.logger.log_trial(test=self.name, trial=trial_no, level='n/a',
+                                              correct=False, rt_s='', miss=False, fa=True,
+                                              anticipatory=False, foreperiod_abort=True,
+                                              foreperiod_s=round(foreperiod, 3))
                         arcade_toast(canvas, win, cx, cy, 'Too soon! Wait for the disc.',
                                      fill='yellow', size=18,
                                      sound='wrong' if self.feedback else None)
@@ -1198,15 +1225,16 @@ class StaticReactionTime:
                     win.update()
                     t0[0] = time.perf_counter()
                     rt = await_space(win, t0[0], timeout_s=1.5)
+                    trial_no += 1
                     if rt is None:
                         misses += 1
-                        self.logger.log_trial(test=self.name, trial=t + 1, level='n/a',
+                        self.logger.log_trial(test=self.name, trial=trial_no, level='n/a',
                                               correct=False, rt_s='', miss=True, fa=False,
                                               anticipatory=False,
                                               foreperiod_s=round(foreperiod, 3))
                     elif rt < MIN_RT_S:
                         fas += 1
-                        self.logger.log_trial(test=self.name, trial=t + 1, level='n/a',
+                        self.logger.log_trial(test=self.name, trial=trial_no, level='n/a',
                                               correct=False, rt_s=round(rt, 4), miss=False, fa=True,
                                               anticipatory=True,
                                               foreperiod_s=round(foreperiod, 3))
@@ -1226,7 +1254,7 @@ class StaticReactionTime:
                             except Exception:
                                 pass
                         rts.append(rt)
-                        self.logger.log_trial(test=self.name, trial=t + 1, level='n/a',
+                        self.logger.log_trial(test=self.name, trial=trial_no, level='n/a',
                                               correct=True, rt_s=round(rt, 4), miss=False, fa=False,
                                               anticipatory=False,
                                               foreperiod_s=round(foreperiod, 3))

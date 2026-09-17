@@ -23,12 +23,15 @@ def gabor_patch(size_px, ppd, sf_cpd, contrast, orientation_deg=0.0,
     carrier = np.sin(2 * math.pi * sf_cpp * xr + math.radians(phase_deg))
     env = np.exp(-(xr ** 2 + yr ** 2) / (2 * sigma_px ** 2))
     lum = bg + contrast * (127.0) * carrier * env
+    lum = np.clip(lum, 0, 255)
     arr = np.clip(np.round(lum), 0, 255).astype(np.uint8)
     return Image.fromarray(arr).convert('RGB')
 
 
 def blank_patch(size_px, bg=BG):
-    arr = np.full((int(size_px), int(size_px), 3), bg, dtype=np.uint8)
+    size_px = int(size_px)
+    arr = np.full((size_px, size_px, 3), bg, dtype=np.uint8)
+    return Image.fromarray(arr).convert('RGB')
     return Image.fromarray(arr)
 
 

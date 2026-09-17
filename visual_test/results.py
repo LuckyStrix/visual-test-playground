@@ -146,13 +146,14 @@ def flags_for(summary):
         out.append("hit the 1-pixel display floor on some trials")
     if s.get("n_catch") == 0 and "d_prime" in s:
         out.append("no catch trials recorded; bias unchecked")
+
     return out
 
 
 def _norm_sentence(kind, display, percentile, band, n, z):
     if display is None:
         return "No score this run."
-    if n < 1:
+    if not isinstance(n, int) or n < 1:
         return f"Your result: {display}. Take more sessions to build a comparison group."
     base = f"Your result: {display}."
     if percentile is None:
@@ -161,6 +162,7 @@ def _norm_sentence(kind, display, percentile, band, n, z):
     if z is not None:
         beat += f" (z {z:+.1f}; + means better)"
     return f"{base} {beat} {band}."
+
 
 
 def interpret(card):
@@ -199,8 +201,9 @@ def format_card_text(card):
     if "d_prime" in (c.get("summary") or {}):
         s = c["summary"]
         lines.append(
-            f"Bias check: hit {s.get('hit_rate')} / false-alarm "
-            f"{s.get('fa_rate')} / d' {s.get('d_prime')}"
+            f"Bias check: hit {s.get('hit_rate') if s.get('hit_rate') is not None else '?'}"
+            f" / false-alarm {s.get('fa_rate') if s.get('fa_rate') is not None else '?'}"
+            f" / d' {s.get('d_prime') if s.get('d_prime') is not None else '?'}"
         )
     lines.append(c["disclaimer"])
     return "\n".join(lines)

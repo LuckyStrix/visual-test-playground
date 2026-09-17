@@ -51,6 +51,10 @@ NAME_TO_KIND = {
 }
 
 
+def _in_range(v, lo, hi):
+    return v is not None and lo <= v <= hi
+
+
 def kind_of(name):
     return NAME_TO_KIND.get(name) or GUI_LABEL_TO_KIND.get(name, "")  # noqa
 
@@ -73,16 +77,18 @@ def extract(kind, summary):
     s = summary or {}
     if s.get("aborted"):
         return None
+    if s.get("truncated"):
+        return None
     higher = kind in HIGHER_BETTER
     if kind in ("contrast", "static_contrast", "masked"):
         thr = _num(s.get("threshold_log"))
-        if thr is None:
+        if thr is None or not -4.0 <= thr <= 1.0:
             return None
         pct = 10.0**thr * 100.0
         return {"value": pct, "display": f"{pct:.1f}% contrast", "higher_better": higher}
     if kind == "acuity":
         thr = _num(s.get("threshold_log"))
-        if thr is None:
+        if thr is None or not -0.5 <= thr <= 2.0:
             return None
         denom = 20.0 * (10.0**thr)
         return {
@@ -92,30 +98,30 @@ def extract(kind, summary):
         }
     if kind in ("color", "static_color"):
         thr = _num(s.get("threshold_log"))
-        if thr is None:
+        if thr is None or not -1.0 <= thr <= 2.5:
             return None
         delta = 10.0**thr
         return {"value": delta, "display": f"{delta:.1f} device steps", "higher_better": higher}
     if kind in ("collinear", "vernier"):
         thr = _num(s.get("threshold_log"))
-        if thr is None:
+        if thr is None or not -4.0 <= thr <= 1.0:
             return None
         arcmin = (10.0**thr) * 60.0
         return {"value": arcmin, "display": f"{arcmin:.1f} arcmin", "higher_better": higher}
     if kind == "brightness":
         thr = _num(s.get("threshold_log"))
-        if thr is None:
+        if thr is None or not -1.0 <= thr <= 2.5:
             return None
         delta = 10.0**thr
         return {"value": delta, "display": f"{delta:.1f} gray steps", "higher_better": higher}
     if kind == "static_rt":
         med = _num(s.get("median_rt_s"))
-        if med is None:
+        if med is None or not 0.05 <= med <= 5.0:
             return None
         return {"value": med * 1000.0, "display": f"{med * 1000.0:.0f} ms", "higher_better": higher}
     if kind == "subitize":
         acc = _num(s.get("accuracy"))
-        if acc is None:
+        if acc is None or not 0.0 <= acc <= 1.0:
             return None
         return {
             "value": acc * 100.0,
@@ -124,7 +130,7 @@ def extract(kind, summary):
         }
     if kind == "hueorder":
         disp = _num(s.get("mean_displacement"))
-        if disp is None:
+        if disp is None or not 0.0 <= disp <= 5.0:
             return None
         return {
             "value": disp,
@@ -133,7 +139,7 @@ def extract(kind, summary):
         }
     if kind == "sizematch":
         bias = _num(s.get("mean_bias"))
-        if bias is None:
+        if bias is None or not -2.0 <= bias <= 2.0:
             return None
         return {
             "value": abs(bias),
@@ -145,7 +151,11 @@ def extract(kind, summary):
 
 def load_session(path):
     try:
-        with open(path) as f:
+        if not isinstance(path, str) or not path.endswith('.json'):
+            return None
+        if os.path.getsize(path) > 10 * 1024 * 1024:
+            return None
+        with open(path, encoding='utf-8') as f:
             doc = json.load(f)
     except (OSError, ValueError):
         return None

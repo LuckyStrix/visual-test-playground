@@ -10,6 +10,12 @@ def safe_name(s):
     return keep.strip('_') or 'anon'
 
 
+def _sanitize(v):
+    if isinstance(v, str) and v[:1] in ('=', '+', '-', '@'):
+        return "'" + v
+    return v
+
+
 class DataLogger:
     """One CSV + one JSON per participant *session*; every trial appends immediately."""
 
@@ -65,7 +71,7 @@ class DataLogger:
 
     def _open(self):
         if self._f is None or getattr(self._f, 'closed', True):
-            self._f = open(self.csv_path, 'a', newline='')
+            self._f = open(self.csv_path, 'a', newline='', encoding='utf-8')
             self._w = None
 
     def _rewrite_with_fields(self, fields):
@@ -74,18 +80,32 @@ class DataLogger:
                 self._f.close()
         except Exception:
             pass
+        self._f = None
+        self._w = None
         rows = []
         try:
-            with open(self.csv_path, 'r', newline='') as rf:
+            with open(self.csv_path, 'r', newline='', encoding='utf-8') as rf:
                 rows = list(csv.DictReader(rf))
         except Exception:
             rows = []
-        with open(self.csv_path, 'w', newline='') as wf:
-            w = csv.DictWriter(wf, fieldnames=fields)
-            w.writeheader()
-            for r in rows:
-                w.writerow({k: r.get(k, '') for k in fields})
-        self._f = open(self.csv_path, 'a', newline='')
+        tmp = self.csv_path + '.tmp'
+        try:
+            with open(tmp, 'w', newline='', encoding='utf-8') as wf:
+                w = csv.DictWriter(wf, fieldnames=fields)
+                w.writeheader()
+                for r in rows:
+                    w.writerow({k: _sanitize(r.get(k, '')) for k in fields})
+                wf.flush()
+                os.fsync(wf.fileno())
+            os.replace(tmp, self.csv_path)
+        except Exception:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except Exception:
+                pass
+            raise
+        self._f = open(self.csv_path, 'a', newline='', encoding='utf-8')
         self._w = csv.DictWriter(self._f, fieldnames=fields)
 
     def _ensure(self, rec):
@@ -95,7 +115,7 @@ class DataLogger:
             try:
                 if self._f.tell() > 0:
                     self._f.flush()
-                    with open(self.csv_path, 'r', newline='') as rf:
+                    with open(self.csv_path, 'r', newline='', encoding='utf-8') as rf:
                         existing = next(csv.reader(rf), [])
             except Exception:
                 existing = []
@@ -126,10 +146,21 @@ class DataLogger:
         rec = {'utc': datetime.now(timezone.utc).isoformat(),
                'participant': self.participant_id, 'session': self.session_id, **rec}
         rec.setdefault('rt_s', '')
-        self._ensure(rec)
-        self._w.writerow({k: rec.get(k, '') for k in self._w.fieldnames})
-        self._f.flush()
-        os.fsync(self._f.fileno())
+        rec = {k: _sanitize(v) for k, v in rec.items()}
+        try:
+            self._ensure(rec)
+            self._w.writerow({k: rec.get(k, '') for k in self._w.fieldnames})
+            self._f.flush()
+            os.fsync(self._f.fileno())
+        except Exception:
+            try:
+                if self._f is not None and not self._f.closed:
+                    self._f.close()
+            except Exception:
+                pass
+            self._f = None
+            self._w = None
+            raise
         self.trials.append(rec)
         try:
             self._write_json()
@@ -137,8 +168,15 @@ class DataLogger:
             pass
 
     def end_test(self, **summary):
+        if not isinstance(summary.get('test'), str) or not summary.get('test'):
+            summary['test'] = 'unknown'
         summary['utc_end'] = datetime.now(timezone.utc).isoformat()
         self.tests.append(summary)
+        try:
+            if self._f is not None and not self._f.closed:
+                self._f.flush()
+        except Exception:
+            pass
         self._write_json()
 
     def save(self):

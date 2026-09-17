@@ -92,6 +92,9 @@ class Staircase:
             else:
                 new_val = max(self.current - step, self.min_val)
             if new_val == self.current:
+                self.direction = None
+                self.n_consec_correct = 0
+                self.n_consec_incorrect = 0
                 finished = (len(self.reversals) >= self.n_reversals
                             or self.trial_num >= self.n_trials_max)
                 return self.current, finished

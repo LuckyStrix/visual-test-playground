@@ -10,10 +10,29 @@ from scipy.optimize import OptimizeWarning, curve_fit
 def weibull(x, alpha, beta, gamma, lam):
     x = np.asarray(x, float)
     alpha = float(alpha)
-    if not np.isfinite(alpha) or alpha <= 0:
+    try:
+        beta = float(beta)
+    except (TypeError, ValueError, OverflowError):
+        return np.full_like(x, np.nan, dtype=float)
+    try:
+        gamma = float(gamma)
+        lam = float(lam)
+    except (TypeError, ValueError, OverflowError):
+        return np.full_like(x, np.nan, dtype=float)
+    import math as _math
+    if (not np.isfinite(alpha) or alpha <= 0 or not _math.isfinite(beta)
+            or not _math.isfinite(gamma) or not _math.isfinite(lam)):
+        return np.full_like(x, np.nan, dtype=float)
+    if not 0.0 <= gamma < 1.0 or not 0.0 <= lam < 1.0 or gamma + lam >= 1.0:
         return np.full_like(x, np.nan, dtype=float)
     with np.errstate(invalid='ignore', divide='ignore'):
-        return gamma + (1 - gamma - lam) * (1 - np.exp(-((x / alpha) ** beta)))
+        with np.errstate(invalid='raise'):
+            try:
+                xa = np.asarray(x, float)
+                xa = np.where(xa < 0, np.nan, xa)
+                return gamma + (1 - gamma - lam) * (1 - np.exp(-((xa / alpha) ** beta)))
+            except (FloatingPointError, ValueError):
+                return np.full_like(x, np.nan, dtype=float)
 
 
 def fit_weibull(levels, correct, guess=0.5, lapse=0.02, log_levels=False):
@@ -24,15 +43,38 @@ def fit_weibull(levels, correct, guess=0.5, lapse=0.02, log_levels=False):
     units. Default False fits levels as given. On failure returns
     alpha=median(binned linear levels).
     """
+    try:
+        guess = float(guess)
+    except (TypeError, ValueError, OverflowError):
+        guess = 0.5
+    try:
+        lapse = float(lapse)
+    except (TypeError, ValueError, OverflowError):
+        lapse = 0.02
+    import math as _math
+    if not _math.isfinite(guess) or not 0.0 <= guess < 1.0:
+        guess = 0.5
+    if not _math.isfinite(lapse) or not 0.0 <= lapse < 1.0:
+        lapse = 0.02
+    if guess + lapse >= 1.0:
+        lapse = max(0.0, min(0.1, 1.0 - guess - 1e-6))
     levels = np.asarray(levels, float).ravel()
     correct = np.asarray(correct, float).ravel()
     if levels.size == 0 or correct.size == 0 or levels.shape != correct.shape:
         return {'alpha': float('nan'), 'beta': float('nan'),
                 'guess': guess, 'lapse': lapse, 'xs': [], 'ys': []}
-    if not np.all(np.isfinite(levels)):
+    if not np.all(np.isfinite(levels)) or not np.all(np.isfinite(correct)):
+        return {'alpha': float('nan'), 'beta': float('nan'),
+                'guess': guess, 'lapse': lapse, 'xs': [], 'ys': []}
+    if np.any((correct < 0) | (correct > 1)):
         return {'alpha': float('nan'), 'beta': float('nan'),
                 'guess': guess, 'lapse': lapse, 'xs': [], 'ys': []}
     lin = 10.0 ** levels if log_levels else levels
+    with np.errstate(over='ignore', invalid='ignore'):
+        lin = np.asarray(lin, float)
+    if not np.all(np.isfinite(lin)):
+        return {'alpha': float('nan'), 'beta': float('nan'),
+                'guess': guess, 'lapse': lapse, 'xs': [], 'ys': []}
     ux = np.unique(lin)
     xm, ym, n = [], [], []
     for u in ux:
@@ -51,11 +93,14 @@ def fit_weibull(levels, correct, guess=0.5, lapse=0.02, log_levels=False):
                                 bounds=([1e-4, 0.5], [np.inf, 8.0]), maxfev=5000,
                                 sigma=sigma)
         return {'alpha': float(popt[0]), 'beta': float(popt[1]),
-                'guess': guess, 'lapse': lapse, 'xs': xm.tolist(), 'ys': ym.tolist()}
+                'guess': guess, 'lapse': lapse, 'xs': xm.tolist(), 'ys': ym.tolist(),
+                'n': n.tolist(), 'fit_failed': False}
     except Exception:
         med = float(np.median(xm))
+        warnings.warn("Weibull fit failed; falling back to median level")
         return {'alpha': med, 'beta': float('nan'),
-                'guess': guess, 'lapse': lapse, 'xs': xm.tolist(), 'ys': ym.tolist()}
+                'guess': guess, 'lapse': lapse, 'xs': xm.tolist(), 'ys': ym.tolist(),
+                'n': n.tolist(), 'fit_failed': True}
 
 
 def plot_staircase(levels, reversals, reversal_trials=None, title='', path='staircase.png'):

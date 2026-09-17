@@ -29,12 +29,14 @@ class DisplayGeometry:
 
 
 def compute_geometry(screen_width_px, screen_height_px, diag_in, viewing_dist_cm):
-    if screen_width_px <= 0 or screen_height_px <= 0:
-        raise ValueError("screen resolution must be positive")
-    if diag_in <= 0:
-        raise ValueError("diagonal must be positive")
-    if viewing_dist_cm <= 0:
-        raise ValueError("viewing distance must be positive")
+    if not isinstance(screen_width_px, int) or screen_width_px <= 0:
+        raise ValueError("screen_width_px must be a positive integer")
+    if not isinstance(screen_height_px, int) or screen_height_px <= 0:
+        raise ValueError("screen_height_px must be a positive integer")
+    if not isinstance(diag_in, (int, float)) or diag_in <= 0:
+        raise ValueError("diag_in must be positive")
+    if not isinstance(viewing_dist_cm, (int, float)) or viewing_dist_cm <= 0:
+        raise ValueError("viewing_dist_cm must be positive")
     diag_cm = diag_in * 2.54
     aspect = screen_width_px / max(1, screen_height_px)
     h_cm = diag_cm / math.sqrt(1 + aspect ** 2)
@@ -50,6 +52,13 @@ def sf_cycles_per_px(sf_cpd, ppd):
 
 
 def nyquist_ok(sf_cpd, ppd):
+    try:
+        sf_cpd = float(sf_cpd)
+        ppd = float(ppd)
+    except Exception:
+        return False
+    if sf_cpd <= 0 or ppd <= 0:
+        return False
     return sf_cpd < ppd / 2
 
 

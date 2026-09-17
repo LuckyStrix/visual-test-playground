@@ -49,6 +49,8 @@ def pooled_rows(data_dir, include_archive=False):
                     continue
                 kind = s.get("kind") or N.kind_of(s.get("test", ""))
                 got = N.extract(kind, s) if kind else None
+                if got is None:
+                    continue
                 rows.append(
                     {
                         "session_file": os.path.basename(path),
@@ -56,8 +58,8 @@ def pooled_rows(data_dir, include_archive=False):
                         "session": session,
                         "kind": kind,
                     "test": s.get("test", ""),
-                    "value": got["value"] if got else "",
-                    "display": got["display"] if got else "",
+                    "value": got["value"],
+                    "display": got["display"],
                     "n_trials": s.get("n_trials", ""),
                     "aborted": bool(s.get("aborted", False)),
                     "truncated": bool(s.get("truncated", False)),

@@ -84,8 +84,13 @@ def stage_refresh(canvas, win, profile, n_frames=120):
     canvas.create_text(cx, cy, text='⚡ VISOR TUNING 1/3 — sensing refresh...', fill='gold',
                        font=('Arial', 18, 'bold'))
     win.update()
-    hz, intervals = measure_refresh_hz(win.update, win.winfo_exists,
-                                       n_frames=n_frames)
+    try:
+        hz, intervals = measure_refresh_hz(win.update, win.winfo_exists,
+                                           n_frames=n_frames)
+    except Exception as e:
+        raise RuntimeError(f"Refresh measurement failed: {e}")
+    if hz is None or not isinstance(hz, (int, float)) or hz <= 0:
+        raise RuntimeError("Refresh measurement returned invalid Hz")
     summ = summarize_frame_intervals(intervals, hz)
     profile.refresh_hz = hz
     profile.refresh_n_frames = summ['n_frames']
