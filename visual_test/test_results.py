@@ -155,3 +155,77 @@ def test_export_commands(tmp_path, capsys):
     assert E.cmd_report(str(tmp_path), str(tmp_path / "s.json")) == 0
     assert E.main(["--data-dir", str(tmp_path), "--list"]) == 0
     assert E.main([]) == 2
+
+
+def test_fixed_trial_tests_honor_seed(tmp_path):
+    from . import tests as T
+
+    assert T.Subitizing.kind == "subitize"
+    assert T.HueOrdering.kind == "hueorder"
+    assert T.SizeMatch.kind == "sizematch"
+    assert T.StaticReactionTime.kind == "static_rt"
+
+    def shuffle_seq(cls, seed, **kw):
+        lg = DataLogger("S", data_dir=str(tmp_path))
+        t = cls("T", lg, seed=seed, **kw)
+        seq = list(range(9))
+        t.rng.shuffle(seq)
+        return seq
+
+    for cls, kw in [(T.Subitizing, {}), (T.HueOrdering, {}),
+                    (T.SizeMatch, {}), (T.StaticReactionTime, {})]:
+        assert shuffle_seq(cls, 42, **kw) == shuffle_seq(cls, 42, **kw)
+        assert shuffle_seq(cls, 42, **kw) != shuffle_seq(cls, 43, **kw)
+
+    import inspect
+
+    from . import main as M
+
+    src = inspect.getsource(M.VisualTestApp.make_test)
+    assert src.count("seed=seed") >= 4
+
+
+def test_session_label_handles_legacy_keys():
+    assert N.session_label({"participant_id": "P", "session_id": "S"}) == ("P", "S")
+    assert N.session_label({"participant": "A", "session": "B"}) == ("A", "B")
+    assert N.session_label({}) == ("?", "?")
+
+
+def test_collect_norms_reads_legacy_named_session(tmp_path):
+    legacy = {
+        "participant_id": "LP",
+        "session_id": "LS",
+        "tests": [{"kind": "contrast", "threshold_log": -1.0, "n_trials": 10}],
+    }
+    (tmp_path / "old.json").write_text(json.dumps(legacy))
+    infos = N.list_sessions(str(tmp_path))
+    assert infos[0]["participant"] == "LP"
+    assert infos[0]["session"] == "LS"
+    group = N.collect_norms(str(tmp_path))
+    assert len(group["contrast"]) == 1
+
+
+def test_export_archive_flag(tmp_path):
+    from . import export as E
+
+    arch = tmp_path / "legacy_archive"
+    arch.mkdir()
+    (tmp_path / "sessions").mkdir()
+    sess = tmp_path / "sessions"
+    _write_session(sess, "new.json", [{"kind": "contrast", "threshold_log": -1.0}])
+    (arch / "old.json").write_text(
+        json.dumps({"participant": "O", "session": "S", "tests": [{"kind": "contrast",
+                    "threshold_log": -0.9}]})
+    )
+    assert len(E.pooled_rows(str(sess))) == 1
+    assert len(E.pooled_rows(str(sess), include_archive=True)) == 2
+    assert E.cmd_list(str(sess), include_archive=True) == 0
+
+
+def test_viewer_entry_marks_archive_source():
+    from .viewer import _entry_text
+
+    assert _entry_text({"participant": "P", "session": "S", "n_tests": 2,
+                        "source": "sessions"}) == "P — S (2 tests)"
+    assert "[legacy_archive]" in _entry_text({"participant": "P", "session": "S",
+                                              "n_tests": 1, "source": "legacy_archive"})

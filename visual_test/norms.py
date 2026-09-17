@@ -152,8 +152,16 @@ def load_session(path):
     return doc if isinstance(doc, dict) else None
 
 
+def session_label(doc):
+    """(participant, session) handling legacy key names too."""
+    doc = doc or {}
+    participant = doc.get("participant", doc.get("participant_id", "?"))
+    session = doc.get("session", doc.get("session_id", "?"))
+    return participant, session
+
+
 def list_sessions(data_dir):
-    """Newest-first list of {'path','participant','session','n_tests'}."""
+    """Newest-first list of {'path','participant','session','n_tests','source'}."""
     out = []
     try:
         files = glob.glob(os.path.join(data_dir, "*.json"))
@@ -168,13 +176,15 @@ def list_sessions(data_dir):
             mtime = os.path.getmtime(path)
         except OSError:
             mtime = 0.0
+        participant, session = session_label(doc)
         out.append(
             {
                 "path": path,
-                "participant": doc.get("participant", "?"),
-                "session": doc.get("session", "?"),
+                "participant": participant,
+                "session": session,
                 "n_tests": len(tests),
                 "mtime": mtime,
+                "source": os.path.basename(os.path.normpath(data_dir)),
             }
         )
     out.sort(key=lambda d: d["mtime"], reverse=True)
@@ -188,6 +198,8 @@ def collect_norms(data_dir, exclude=None):
         if info["path"] == exclude:
             continue
         doc = load_session(info["path"])
+        if doc is None:
+            continue
         for s in doc.get("tests") or []:
             if not isinstance(s, dict):
                 continue

@@ -410,11 +410,12 @@ class VisualTestApp:
         if kind == 'vernier':
             return VernierJudgment('Vernier L/R', self.logger, ppd, dict(sp), **base)
         if kind == 'subitize':
-            return Subitizing('Subitizing 1-9', self.logger, n_trials=n, feedback=fb, ppd=ppd)
+            return Subitizing('Subitizing 1-9', self.logger, n_trials=n, feedback=fb,
+                              ppd=ppd, seed=seed)
         if kind == 'hueorder':
-            return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd)
+            return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd, seed=seed)
         if kind == 'sizematch':
-            return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd)
+            return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd, seed=seed)
         if kind == 'masked':
             return MaskedGabor('Masked Gabor Y/N', self.logger, ppd, dict(sp), **base)
         if kind == 'static_contrast':
@@ -422,7 +423,8 @@ class VisualTestApp:
         if kind == 'static_color':
             return StaticColorBullseye('Static Bullseye R/B', self.logger, ppd, dict(sp), **base)
         if kind == 'static_rt':
-            return StaticReactionTime('Static Reaction Time', self.logger, n_trials=n, ppd=ppd)
+            return StaticReactionTime('Static Reaction Time', self.logger, n_trials=n,
+                                      ppd=ppd, seed=seed)
         if kind == 'contrast':
             return ContrastDetection2IFC('Contrast 2IFC', self.logger, ppd, dict(sp), **base)
         if kind == 'acuity':

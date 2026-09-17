@@ -105,8 +105,13 @@ Headless exports:
 python3 -m visual_test.export --list
 python3 -m visual_test.export --summary
 python3 -m visual_test.export --pooled pooled.csv
+python3 -m visual_test.export --pooled pooled.csv --include-archive
 python3 -m visual_test.export --report visual_test/data/sessions/<session>.json
 ```
+
+The session list is scrollable; tick "Include legacy archive" to browse
+read-only legacy sessions alongside current ones (norms only use the
+current directory, so legacy schema differences can't skew ranks).
 
 All results are experimental playground estimates, not clinical measures.
 

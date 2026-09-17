@@ -27,23 +27,34 @@ def default_data_dir():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sessions")
 
 
-def pooled_rows(data_dir):
+def target_dirs(data_dir, include_archive=False):
+    dirs = [data_dir]
+    if include_archive:
+        arch = os.path.join(os.path.dirname(os.path.abspath(data_dir)), "legacy_archive")
+        if os.path.isdir(arch) and os.path.abspath(arch) != os.path.abspath(data_dir):
+            dirs.append(arch)
+    return dirs
+
+
+def pooled_rows(data_dir, include_archive=False):
     rows = []
-    for path in sorted(glob.glob(os.path.join(data_dir, "*.json"))):
-        doc = N.load_session(path)
-        if doc is None:
-            continue
-        for s in doc.get("tests") or []:
-            if not isinstance(s, dict):
+    for d in target_dirs(data_dir, include_archive):
+        for path in sorted(glob.glob(os.path.join(d, "*.json"))):
+            doc = N.load_session(path)
+            if doc is None:
                 continue
-            kind = s.get("kind") or N.kind_of(s.get("test", ""))
-            got = N.extract(kind, s) if kind else None
-            rows.append(
-                {
-                    "session_file": os.path.basename(path),
-                    "participant": doc.get("participant", ""),
-                    "session": doc.get("session", ""),
-                    "kind": kind,
+            participant, session = N.session_label(doc)
+            for s in doc.get("tests") or []:
+                if not isinstance(s, dict):
+                    continue
+                kind = s.get("kind") or N.kind_of(s.get("test", ""))
+                got = N.extract(kind, s) if kind else None
+                rows.append(
+                    {
+                        "session_file": os.path.basename(path),
+                        "participant": participant,
+                        "session": session,
+                        "kind": kind,
                     "test": s.get("test", ""),
                     "value": got["value"] if got else "",
                     "display": got["display"] if got else "",
@@ -58,8 +69,11 @@ def pooled_rows(data_dir):
     return rows
 
 
-def cmd_list(data_dir):
-    infos = N.list_sessions(data_dir)
+def cmd_list(data_dir, include_archive=False):
+    infos = []
+    for d in target_dirs(data_dir, include_archive):
+        infos.extend(N.list_sessions(d))
+    infos.sort(key=lambda s: s["mtime"], reverse=True)
     if not infos:
         print("no sessions found in", data_dir)
         return 0
@@ -68,8 +82,8 @@ def cmd_list(data_dir):
     return 0
 
 
-def cmd_pooled(data_dir, out_path):
-    rows = pooled_rows(data_dir)
+def cmd_pooled(data_dir, out_path, include_archive=False):
+    rows = pooled_rows(data_dir, include_archive)
     fields = [
         "session_file",
         "participant",
@@ -110,7 +124,7 @@ def cmd_summary(data_dir):
 
 
 def cmd_report(data_dir, session_path):
-    text = session_report_text(session_path, data_dir)
+    text = session_report_text(session_path, os.path.dirname(os.path.abspath(session_path)))
     if text is None:
         print(f"could not read {session_path}", file=sys.stderr)
         return 1
@@ -125,11 +139,13 @@ def main(argv=None):
     ap.add_argument("--pooled", metavar="OUT.csv", help="write pooled per-test CSV")
     ap.add_argument("--summary", action="store_true", help="print per-kind norm summary")
     ap.add_argument("--report", metavar="SESSION.json", help="print a session report")
+    ap.add_argument("--include-archive", action="store_true",
+                    help="include data/legacy_archive in --list/--pooled")
     args = ap.parse_args(argv)
     if args.list:
-        return cmd_list(args.data_dir)
+        return cmd_list(args.data_dir, args.include_archive)
     if args.pooled:
-        return cmd_pooled(args.data_dir, args.pooled)
+        return cmd_pooled(args.data_dir, args.pooled, args.include_archive)
     if args.summary:
         return cmd_summary(args.data_dir)
     if args.report:

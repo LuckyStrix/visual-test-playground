@@ -25,7 +25,8 @@ def session_report_text(path, data_dir):
     if got is None:
         return None
     doc = got["doc"]
-    parts = [f"{doc.get('participant', '?')} — {doc.get('session', '?')}"]
+    participant, session = N.session_label(doc)
+    parts = [f"{participant} — {session}"]
     parts.append(R.summarize_session(got["cards"])["headline"])
     parts.append("")
     for card in got["cards"]:
@@ -35,7 +36,35 @@ def session_report_text(path, data_dir):
     return "\n".join(parts)
 
 
+def _dirs_for(data_dir, include_archive):
+    import os
+
+    dirs = [data_dir]
+    if include_archive:
+        arch = os.path.join(os.path.dirname(os.path.abspath(data_dir)), "legacy_archive")
+        if os.path.isdir(arch) and os.path.abspath(arch) != os.path.abspath(data_dir):
+            dirs.append(arch)
+    return dirs
+
+
+def _sessions_in(dirs):
+    out = []
+    for d in dirs:
+        out.extend(N.list_sessions(d))
+    out.sort(key=lambda s: s["mtime"], reverse=True)
+    return out
+
+
+def _entry_text(s):
+    base = f"{s['participant']} — {s['session']} ({s['n_tests']} tests)"
+    if s.get("source") and s["source"] not in ("sessions",):
+        base += f" [{s['source']}]"
+    return base
+
+
 def open_viewer(root, data_dir, tk_mod=None):
+    import os
+
     if tk_mod is None:
         import tkinter as tk_mod
 
@@ -45,12 +74,24 @@ def open_viewer(root, data_dir, tk_mod=None):
     top = tk_mod.Frame(win)
     top.pack(fill="x", padx=10, pady=6)
     tk_mod.Label(top, text="Session:", font=("Arial", 11, "bold")).pack(side="left")
-    sessions = N.list_sessions(data_dir)
-    names = [f"{s['participant']} — {s['session']} ({s['n_tests']} tests)" for s in sessions]
-    box = tk_mod.Listbox(top, height=5)
+    include_archive = tk_mod.BooleanVar(value=False)
+    sessions = _sessions_in(_dirs_for(data_dir, False))
+    names = [_entry_text(s) for s in sessions]
+    list_frame = tk_mod.Frame(top)
+    list_frame.pack(side="left", fill="x", expand=True, padx=6)
+    scroll = tk_mod.Scrollbar(list_frame, orient="vertical")
+    box = tk_mod.Listbox(list_frame, height=8, yscrollcommand=scroll.set, exportselection=False)
+    scroll.config(command=box.yview)
+    scroll.pack(side="right", fill="y")
     for n in names:
         box.insert("end", n)
-    box.pack(side="left", fill="x", expand=True, padx=6)
+    box.pack(side="left", fill="x", expand=True)
+
+    ctrl = tk_mod.Frame(win)
+    ctrl.pack(fill="x", padx=10)
+    tk_mod.Checkbutton(ctrl, text="Include legacy archive", variable=include_archive,
+                       command=lambda: refresh()).pack(side="left")
+    tk_mod.Button(ctrl, text="Refresh", command=lambda: refresh()).pack(side="left", padx=6)
 
     body = tk_mod.Text(win, wrap="word", state="disabled")
     body.pack(fill="both", expand=True, padx=10, pady=6)
@@ -66,11 +107,12 @@ def open_viewer(root, data_dir, tk_mod=None):
             render("No sessions recorded yet. Run a session first.")
             return
         info = sessions[idx]
-        got = interpret_session(info["path"], data_dir)
+        own_dir = os.path.dirname(info["path"])
+        got = interpret_session(info["path"], own_dir)
         if got is None:
             render(f"Could not read {info['path']}.")
             return
-        parts = [f"{info['participant']} — {info['session']}"]
+        parts = [_entry_text(info)]
         head = R.summarize_session(got["cards"])["headline"]
         parts.append(head)
         parts.append("")
@@ -85,12 +127,11 @@ def open_viewer(root, data_dir, tk_mod=None):
         show(cur[0] if cur else None)
 
     box.bind("<<ListboxSelect>>", on_pick)
-    tk_mod.Button(top, text="Refresh", command=lambda: refresh()).pack(side="left")
 
     def refresh():
         nonlocal sessions, names
-        sessions = N.list_sessions(data_dir)
-        names = [f"{s['participant']} — {s['session']} ({s['n_tests']} tests)" for s in sessions]
+        sessions = _sessions_in(_dirs_for(data_dir, include_archive.get()))
+        names = [_entry_text(s) for s in sessions]
         box.delete(0, "end")
         for n in names:
             box.insert("end", n)
