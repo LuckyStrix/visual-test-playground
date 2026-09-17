@@ -604,7 +604,7 @@ class StaticColorBullseye(Base):
 
 
 class CollinearJudgment(Base):
-    """Idea 2: two static bars — aligned (Y) or offset (N)?
+    """Two static bars — aligned (Y) or offset (N)?
 
     Aligned trials are catches (excluded from the staircase) that estimate
     the false-alarm rate; the staircase tracks offset trials only."""
@@ -655,7 +655,7 @@ class CollinearJudgment(Base):
 
 
 class BrightnessMatch(Base):
-    """Idea 3: identical grey patches on dark vs light rings — same (Y) or different (N)?
+    """Identical grey patches on dark vs light rings — same (Y) or different (N)?
 
     Same-patch trials are catches (excluded from the staircase); the
     staircase tracks different-patch trials only, i.e. the luminance delta
@@ -709,7 +709,7 @@ class BrightnessMatch(Base):
 
 
 class VernierJudgment(Base):
-    """Idea 6: static vernier — is the LOWER bar LEFT or RIGHT of the upper?"""
+    """Static vernier — is the LOWER bar LEFT or RIGHT of the upper?"""
 
     def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
                  seed=None):
@@ -744,7 +744,7 @@ class VernierJudgment(Base):
 
 
 class Subitizing:
-    """Idea 15: static dot cloud, press 1-9 for how many. Accuracy + RT per numerosity."""
+    """Static dot cloud, press 1-9 for how many. Accuracy + RT per numerosity."""
 
     def __init__(self, name, logger, n_trials=36, feedback=True, ppd=43.0, seed=None):
         self.name = name
@@ -802,7 +802,7 @@ class Subitizing:
 
 
 class HueOrdering:
-    """Idea 19: six static hue chips in scrambled order; click them light→dark.
+    """Six static hue chips in scrambled order; click them light→dark.
     Score = mean displacement from correct order."""
 
     def __init__(self, name, logger, n_trials=6, ppd=43.0, seed=None):
@@ -906,7 +906,7 @@ class HueOrdering:
 
 
 class SizeMatch:
-    """Idea 26: left disc fixed; Up/Down resizes right disc; Enter when equal.
+    """Left disc fixed; Up/Down resizes right disc; Enter when equal.
     Reports bias = matched/reference - 1 per trial (illusion strength)."""
 
     def __init__(self, name, logger, n_trials=10, ppd=43.0, seed=None):
@@ -961,7 +961,7 @@ class SizeMatch:
 
 
 class MaskedGabor(Base):
-    """Idea 43: brief static Gabor (~50 ms) then noise mask. Y = stripes, N = nothing.
+    """Brief static Gabor (~50 ms) then noise mask. Y = stripes, N = nothing.
 
     Absent trials are catches (excluded from the staircase); the summary
     reports hit rate, false-alarm rate and d' alongside the threshold."""

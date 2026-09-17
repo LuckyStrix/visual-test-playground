@@ -137,7 +137,7 @@ def bright_disc(size_px, lum=255, bg=BG):
 
 
 def collinear_segments(size_px, offset_px, gap_px=None, lum=235, bg=BG):
-    """Idea 2: two horizontal white bars left/right of center, right bar shifted
+    """Two horizontal white bars left/right of center, right bar shifted
     vertically by offset_px. Judge: aligned (Y) or offset (N)?"""
     s = int(size_px)
     gap_px = int(round(s * 0.08)) if gap_px is None else gap_px
@@ -153,7 +153,7 @@ def collinear_segments(size_px, offset_px, gap_px=None, lum=235, bg=BG):
 
 
 def brightness_pair(size_px, patch=128, patch_right=None, dark_ring=40, light_ring=220):
-    """Idea 3: two grey patches, one on a dark ring, one on light ring.
+    """Two grey patches, one on a dark ring, one on light ring.
     Left patch uses `patch`, right uses `patch_right` (defaults to `patch`
     for backwards compatibility). Judge: same brightness (Y) or different (N)?"""
     if patch_right is None:
@@ -170,7 +170,7 @@ def brightness_pair(size_px, patch=128, patch_right=None, dark_ring=40, light_ri
 
 
 def vernier_bars(size_px, offset_px, lum=235, bg=BG):
-    """Idea 6: upper bar fixed, lower bar shifted horizontally by offset_px.
+    """Upper bar fixed, lower bar shifted horizontally by offset_px.
     Judge: lower bar LEFT or RIGHT of upper? (hyperacuity)."""
     s = int(size_px)
     arr = np.full((s, s, 3), bg, dtype=np.uint8)
@@ -185,7 +185,7 @@ def vernier_bars(size_px, offset_px, lum=235, bg=BG):
 
 
 def dot_cloud(size_px, n, dot_r=5, lum=255, bg=BG, seed=None):
-    """Idea 15: n non-overlapping white dots. Judge: how many (1-9)?"""
+    """N non-overlapping white dots. Judge: how many (1-9)?"""
     rng = np.random.default_rng(seed)
     s = int(size_px)
     dot_r = min(dot_r, max(1, s // 8))
@@ -207,13 +207,13 @@ def dot_cloud(size_px, n, dot_r=5, lum=255, bg=BG, seed=None):
 
 
 def hue_chips():
-    """Idea 19: six hues (red orange yellow green blue purple) as RGB tuples."""
+    """Six hues (red orange yellow green blue purple) as RGB tuples."""
     return [(228, 60, 60), (235, 140, 40), (235, 215, 60),
             (90, 180, 90), (80, 130, 230), (150, 90, 200)]
 
 
 def size_pair(size_px, ref_diam, cmp_diam, lum=235, bg=BG):
-    """Idea 26: reference disc (left) fixed, comparison disc (right) adjustable."""
+    """Reference disc (left) fixed, comparison disc (right) adjustable."""
     s = int(size_px)
     arr = np.full((s, s, 3), bg, dtype=np.uint8)
     yy, xx = np.mgrid[0:s, 0:s].astype(float)
@@ -224,7 +224,7 @@ def size_pair(size_px, ref_diam, cmp_diam, lum=235, bg=BG):
 
 
 def noise_mask(size_px, bg=BG, amp=90, seed=None):
-    """Idea 43: white-noise mask shown right after a brief Gabor."""
+    """White-noise mask shown right after a brief Gabor."""
     rng = np.random.default_rng(seed)
     s = int(size_px)
     arr = rng.integers(bg - amp, bg + amp + 1, (s, s)).clip(0, 255).astype(np.uint8)
