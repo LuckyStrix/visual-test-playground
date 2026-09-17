@@ -357,6 +357,7 @@ class Base:
                                           level=lvl, correct=bool(ok), rt_s=round(rt, 3),
                                           practice=True,
                                           **{k: v for k, v in extra.items() if k != 'catch'})
+                    _streak_reset(self)
                     continue
                 n_main += 1
                 if extra.get('catch'):
@@ -897,11 +898,13 @@ class HueOrdering:
     Score = mean displacement from correct order."""
     kind = 'hueorder'
 
-    def __init__(self, name, logger, n_trials=6, ppd=43.0, seed=None):
+    def __init__(self, name, logger, n_trials=6, ppd=43.0, seed=None,
+                 feedback=True):
         self.name = name
         self.logger = logger
         self.n_trials = max(1, int(n_trials))
         self.ppd = ppd
+        self.feedback = feedback
         self.seed = random.randrange(2 ** 31) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
         self.np_rng = np.random.default_rng(self.seed)
@@ -991,7 +994,7 @@ class HueOrdering:
                 msg = 'PERFECT! Score 0.00' if perfect else f'Score {score:.2f} (0 = perfect)'
                 arcade_toast(canvas, win, cx, cy, msg,
                              fill='gold' if perfect else 'white', size=20,
-                             sound='correct' if perfect else None)
+                             sound='correct' if (perfect and self.feedback) else None)
                 wait_ms(win, 800)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
             record_abort(self.logger, self.name, e, kind=self.kind,
@@ -1010,11 +1013,13 @@ class SizeMatch:
     Reports bias = matched/reference - 1 per trial (illusion strength)."""
     kind = 'sizematch'
 
-    def __init__(self, name, logger, n_trials=10, ppd=43.0, seed=None):
+    def __init__(self, name, logger, n_trials=10, ppd=43.0, seed=None,
+                 feedback=True):
         self.name = name
         self.logger = logger
         self.n_trials = max(1, int(n_trials))
         self.ppd = ppd
+        self.feedback = feedback
         self.seed = random.randrange(2 ** 31) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
 
@@ -1128,11 +1133,13 @@ class StaticReactionTime:
     No staircase; reports median RT and misses. Fixed trial count."""
     kind = 'static_rt'
 
-    def __init__(self, name, logger, n_trials=30, ppd=43.0, seed=None):
+    def __init__(self, name, logger, n_trials=30, ppd=43.0, seed=None,
+                 feedback=True):
         self.name = name
         self.logger = logger
         self.n_trials = max(1, int(n_trials))
         self.ppd = ppd
+        self.feedback = feedback
         self.seed = random.randrange(2 ** 31) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
 
@@ -1179,7 +1186,8 @@ class StaticReactionTime:
                     if early:
                         fas += 1
                         arcade_toast(canvas, win, cx, cy, 'Too soon! Wait for the disc.',
-                                     fill='yellow', size=18, sound='wrong')
+                                     fill='yellow', size=18,
+                                     sound='wrong' if self.feedback else None)
                         wait_ms(win, 700)
                         continue
                     canvas.delete('all')
@@ -1202,11 +1210,12 @@ class StaticReactionTime:
                                               anticipatory=True,
                                               foreperiod_s=round(foreperiod, 3))
                         arcade_toast(canvas, win, cx, cy, 'Too soon! Wait for the disc.',
-                                     fill='yellow', size=18, sound='wrong')
+                                     fill='yellow', size=18,
+                                     sound='wrong' if self.feedback else None)
                         wait_ms(win, 700)
                         continue
                     else:
-                        if rt < 0.30:
+                        if rt < 0.30 and self.feedback:
                             try:
                                 try:
                                     from .assets import play_async as _play

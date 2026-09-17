@@ -7,6 +7,7 @@ visual_test/data/game_<participant>.json, separate from session JSON so
 norms stay pure.
 """
 import json
+import math
 import os
 from datetime import datetime, timezone
 
@@ -36,6 +37,8 @@ def level_for_xp(xp):
 def xp_into_level(xp):
     xp = int(max(0, xp or 0))
     lvl = level_for_xp(xp)
+    if lvl >= MAX_LEVEL:
+        return lvl, 0, 0
     base = lvl * XP_PER_LEVEL
     return lvl, xp - base, XP_PER_LEVEL
 
@@ -45,7 +48,7 @@ def _num(v):
         f = float(v)
     except (TypeError, ValueError):
         return None
-    return f if f == f else None
+    return f if math.isfinite(f) else None
 
 
 def xp_for_card(card):
@@ -95,7 +98,7 @@ def badges_for_session(cards, calibrated=False):
             break
     if len(scored) >= 13:
         out.append("marathon")
-    if calibrated:
+    if calibrated and scored:
         out.append("calibrated")
     seen = set()
     uniq = []
@@ -113,8 +116,34 @@ def summarize_rewards(cards, calibrated=False):
 
 
 def profile_path(participant, data_dir):
-    base_dir = os.path.dirname(os.path.abspath(data_dir))
-    return os.path.join(base_dir, f"game_{safe_name(participant)}.json")
+    root = os.path.abspath(data_dir)
+    if os.path.basename(os.path.normpath(root)) == "sessions":
+        root = os.path.dirname(root)
+    return os.path.join(root, f"game_{safe_name(participant)}.json")
+
+
+def _coerce_profile(doc, participant):
+    if not isinstance(doc, dict):
+        doc = {}
+    doc.setdefault("participant", safe_name(participant))
+    try:
+        doc["xp"] = max(0, int(doc.get("xp", 0)))
+    except (TypeError, ValueError):
+        doc["xp"] = 0
+    try:
+        doc["sessions"] = max(0, int(doc.get("sessions", 0)))
+    except (TypeError, ValueError):
+        doc["sessions"] = 0
+    badges = doc.get("badges")
+    if not isinstance(badges, list):
+        badges = []
+    doc["badges"] = sorted({b for b in badges if isinstance(b, str) and b in BADGES})
+    hist = doc.get("history")
+    if not isinstance(hist, list):
+        hist = []
+    doc["history"] = hist[-50:]
+    doc.setdefault("last_session_utc", None)
+    return doc
 
 
 def load_profile(participant, data_dir):
@@ -123,11 +152,7 @@ def load_profile(participant, data_dir):
         with open(path) as f:
             doc = json.load(f)
         if isinstance(doc, dict):
-            doc.setdefault("participant", safe_name(participant))
-            doc.setdefault("xp", 0)
-            doc.setdefault("badges", [])
-            doc.setdefault("sessions", 0)
-            return doc
+            return _coerce_profile(doc, participant)
     except (OSError, ValueError):
         pass
     return {"participant": safe_name(participant), "xp": 0, "badges": [],
@@ -147,27 +172,67 @@ def save_profile(participant, data_dir, profile):
     return path
 
 
-_STREAKS = {}
+_FALLBACK_STREAKS = {}
+_FALLBACK_HOLD = {}
+
+
+def _fallback_hold(k, handle):
+    _FALLBACK_HOLD[k] = handle
+    if len(_FALLBACK_HOLD) > 1024:
+        try:
+            oldest = next(iter(_FALLBACK_HOLD))
+            _FALLBACK_HOLD.pop(oldest, None)
+            _FALLBACK_STREAKS.pop(oldest, None)
+        except Exception:
+            pass
 
 
 def reset_streak(handle):
     try:
-        _STREAKS[id(handle)] = 0
+        handle._arcade_streak = 0
+        return
+    except Exception:
+        pass
+    try:
+        k = id(handle)
+        _FALLBACK_STREAKS[k] = 0
+        _fallback_hold(k, handle)
     except Exception:
         pass
 
 
 def note_result(handle, ok):
-    key = id(handle)
-    if ok:
-        _STREAKS[key] = int(_STREAKS.get(key, 0)) + 1
-    else:
-        _STREAKS[key] = 0
-    return int(_STREAKS.get(key, 0))
+    try:
+        cur = getattr(handle, "_arcade_streak", None)
+        if isinstance(cur, int):
+            nxt = cur + 1 if ok else 0
+            handle._arcade_streak = nxt
+            return nxt
+    except Exception:
+        pass
+    try:
+        k = id(handle)
+        if ok:
+            _FALLBACK_STREAKS[k] = int(_FALLBACK_STREAKS.get(k, 0)) + 1
+        else:
+            _FALLBACK_STREAKS[k] = 0
+        _fallback_hold(k, handle)
+        return int(_FALLBACK_STREAKS.get(k, 0))
+    except Exception:
+        return 1 if ok else 0
 
 
 def streak_of(handle):
-    return int(_STREAKS.get(id(handle), 0))
+    try:
+        cur = getattr(handle, "_arcade_streak", None)
+        if isinstance(cur, int):
+            return int(cur)
+    except Exception:
+        pass
+    try:
+        return int(_FALLBACK_STREAKS.get(id(handle), 0))
+    except Exception:
+        return 0
 
 
 def points_for(ok, streak):
@@ -178,6 +243,9 @@ def points_for(ok, streak):
 
 def add_session(participant, data_dir, cards, session_id=None, calibrated=False):
     """Persist one session's rewards. Returns (profile, gained, new_badges, leveled_up)."""
+    cards = [c for c in (cards or []) if isinstance(c, dict) and c.get("display")]
+    if not cards:
+        raise ValueError("no scored tests; skipping XP")
     prof = load_profile(participant, data_dir)
     old_level = level_for_xp(prof.get("xp", 0))
     old_badges = set(prof.get("badges") or [])

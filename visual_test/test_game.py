@@ -80,3 +80,70 @@ def test_assets_generate(tmp_path, monkeypatch):
     assert d == str(tmp_path)
     assert A.sound_path("correct") is not None
     assert A.mission_meta("acuity")[1] == "Gap Sniper"
+
+
+def test_max_level_header():
+    assert G.xp_into_level(5000) == (G.MAX_LEVEL, 0, 0)
+    assert G.xp_into_level(99999) == (G.MAX_LEVEL, 0, 0)
+
+
+def test_num_rejects_inf_nan():
+    assert G._num(float("inf")) is None
+    assert G._num(float("nan")) is None
+    bad = card(pct=float("inf"), band="Top 10%", z=float("inf"))
+    assert G.xp_for_card(bad) == 100
+
+
+def test_streak_isolation():
+    class H:
+        pass
+    a, b = H(), H()
+    G.reset_streak(a)
+    G.reset_streak(b)
+    G.note_result(a, True)
+    G.note_result(a, True)
+    assert G.streak_of(a) == 2
+    assert G.streak_of(b) == 0
+    G.note_result(b, True)
+    assert G.streak_of(a) == 2
+    assert G.streak_of(b) == 1
+
+
+def test_empty_session_rejected(tmp_path):
+    import pytest
+    with pytest.raises(ValueError):
+        G.add_session("P1", str(tmp_path), [], session_id="s0")
+    assert G.badges_for_session([], calibrated=True) == []
+
+
+def test_profile_stays_in_tmpdir(tmp_path):
+    p = G.profile_path("P1", str(tmp_path))
+    assert os.path.dirname(p) == str(tmp_path)
+
+
+def test_profile_coerces_corrupt(tmp_path, monkeypatch):
+    import json
+    p = G.profile_path("P1", str(tmp_path))
+    with open(p, "w") as f:
+        json.dump({"xp": "oops", "sessions": "oops", "badges": "oops",
+                   "history": "oops"}, f)
+    prof = G.load_profile("P1", str(tmp_path))
+    assert prof["xp"] == 0
+    assert prof["sessions"] == 0
+    assert prof["badges"] == []
+
+
+def test_viewer_ranked_card_shows_xp():
+    from .viewer import _card_text
+    c = {"kind": "static_rt", "name": "x", "value": 250.0,
+         "display": "250 ms", "percentile": 80.0, "band": "Above average",
+         "z": 0.5, "n": 10, "summary": {}}
+    text = _card_text(dict(c))
+    assert "+210 XP" in text
+
+
+def test_fixed_trial_classes_accept_feedback_flag():
+    from . import tests as T
+    import inspect
+    for cls in (T.HueOrdering, T.SizeMatch, T.StaticReactionTime):
+        assert "feedback" in inspect.signature(cls.__init__).parameters

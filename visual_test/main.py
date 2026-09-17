@@ -208,8 +208,12 @@ class VisualTestApp:
             prof = G.load_profile(self.logger.participant_id, self.logger.data_dir)
             xp = int(prof.get("xp", 0))
             lvl, into, need = G.xp_into_level(xp)
-            self.game_lbl.set(f'Lv {lvl} {self.logger.participant_id} — {xp} XP '
-                              f'({into}/{need} to next)')
+            if need:
+                lvl_txt = (f'Lv {lvl} {self.logger.participant_id} — {xp} XP '
+                           f'({into}/{need} to next)')
+            else:
+                lvl_txt = f'Lv {lvl} {self.logger.participant_id} — {xp} XP (MAX)'
+            self.game_lbl.set(lvl_txt)
             badges = prof.get("badges") or []
             if badges:
                 names = [G.BADGES.get(b, b) for b in badges[:4]]
@@ -218,7 +222,10 @@ class VisualTestApp:
             else:
                 self.badge_lbl.set('No badges yet — play a mission!')
             try:
-                ap = A.avatar_path(abs(hash(self.logger.participant_id)) % 4)
+                import hashlib
+                digest = hashlib.md5(
+                    self.logger.participant_id.encode("utf-8")).hexdigest()
+                ap = A.avatar_path(int(digest, 16) % 4)
                 if ap:
                     self.avatar_img = A.photo_image(ap, size=(40, 40))
                     if self.avatar_img is not None:
@@ -235,12 +242,56 @@ class VisualTestApp:
             import norms as N  # type: ignore[no-redef]
         best = {}
         try:
-            for info in N.list_sessions(self.logger.data_dir):
+            infos = N.list_sessions(self.logger.data_dir)
+            docs = []
+            for info in infos:
                 try:
                     doc = N.load_session(info["path"])
-                    if doc is None:
+                except Exception:
+                    continue
+                if doc is None:
+                    continue
+                docs.append((info, doc))
+            values_by_kind = {}
+            kinds_by_doc = []
+            for info, doc in docs:
+                per_doc = {}
+                try:
+                    tests = doc.get("tests") or []
+                except Exception:
+                    tests = []
+                for s in tests:
+                    if not isinstance(s, dict):
                         continue
-                    group = N.collect_norms(self.logger.data_dir, exclude=info["path"])
+                    if s.get("aborted") or s.get("truncated"):
+                        continue
+                    kind = s.get("kind") or N.kind_of(s.get("test", ""))
+                    if not kind:
+                        continue
+                    try:
+                        got = N.extract(kind, s)
+                    except Exception:
+                        continue
+                    if got is None:
+                        continue
+                    values_by_kind.setdefault(kind, []).append(got["value"])
+                    per_doc.setdefault(kind, []).append(got["value"])
+                kinds_by_doc.append((info, doc, per_doc))
+            for info, doc, per_doc in kinds_by_doc:
+                try:
+                    group = {}
+                    for kind, vals in values_by_kind.items():
+                        own = per_doc.get(kind, [])
+                        if own:
+                            remaining = list(vals)
+                            for v in own:
+                                try:
+                                    remaining.remove(v)
+                                except ValueError:
+                                    pass
+                            group[kind] = remaining
+                        else:
+                            group[kind] = vals
                     for card in N.score_session(doc, group):
                         pct = card.get("percentile")
                         if pct is None:
@@ -492,9 +543,11 @@ class VisualTestApp:
             return Subitizing('Subitizing 1-9', self.logger, n_trials=n, feedback=fb,
                               ppd=ppd, seed=seed)
         if kind == 'hueorder':
-            return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd, seed=seed)
+            return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd, seed=seed,
+                               feedback=fb)
         if kind == 'sizematch':
-            return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd, seed=seed)
+            return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd, seed=seed,
+                             feedback=fb)
         if kind == 'masked':
             return MaskedGabor('Masked Gabor Y/N', self.logger, ppd, dict(sp), **base)
         if kind == 'static_contrast':
@@ -503,7 +556,7 @@ class VisualTestApp:
             return StaticColorBullseye('Static Bullseye R/B', self.logger, ppd, dict(sp), **base)
         if kind == 'static_rt':
             return StaticReactionTime('Static Reaction Time', self.logger, n_trials=n,
-                                      ppd=ppd, seed=seed)
+                                      ppd=ppd, seed=seed, feedback=fb)
         if kind == 'contrast':
             return ContrastDetection2IFC('Contrast 2IFC', self.logger, ppd, dict(sp), **base)
         if kind == 'acuity':
@@ -521,16 +574,17 @@ class VisualTestApp:
         for var in self.test_vars.values():
             var.set(False)
 
-    def briefing(self, canvas, win, kind, i, total):
+    def briefing(self, canvas, win, kind, i, total, feedback=True):
         try:
             from .tests import wait_ms
         except ImportError:
             from tests import wait_ms  # type: ignore[no-redef]
         icon, title, tag = A.mission_meta(kind)
-        try:
-            A.play_async('click', widget=win)
-        except Exception:
-            pass
+        if feedback:
+            try:
+                A.play_async('click', widget=win)
+            except Exception:
+                pass
         w = canvas.winfo_width() or 800
         bar_w = int(w * 0.6)
         x0 = (w - bar_w) // 2
@@ -589,7 +643,7 @@ class VisualTestApp:
                 test = self.make_test(kind, n, fb, seed=seed)
                 self.log(f'Starting {test.name} ({i + 1}/{len(kinds)})')
                 try:
-                    self.briefing(canvas, win, kind, i, len(kinds))
+                    self.briefing(canvas, win, kind, i, len(kinds), feedback=fb)
                 except Exception:
                     pass
                 instr = INSTR[kind]
@@ -654,6 +708,8 @@ class VisualTestApp:
             try:
                 got = interpret_session(self.logger.json_path, self.logger.data_dir)
                 cards = got["cards"] if got else []
+                if not any(isinstance(c, dict) and c.get("display") for c in cards):
+                    raise ValueError("no scored tests; skipping XP")
                 calibrated = self.display_profile.summary() != 'not calibrated'
                 prof, gained, new_badges, leveled = G.add_session(
                     self.logger.participant_id, self.logger.data_dir, cards,

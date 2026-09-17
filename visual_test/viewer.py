@@ -173,11 +173,11 @@ def _card_text(card):
         xp = 0
     lines = [f"-- {c['title']} --", c["what"]]
     if c.get("display"):
-        lines.append(f"Your result: {c['display']}  (+{xp} XP)")
+        lines.append(f"Your result: {c['display']}")
     else:
         lines.append("No score (aborted or incomplete).")
     if c.get("percentile") is not None:
-        lines.append(_bar(c["percentile"], xp=None) + f"  ({c['band']}, n={c['n']})")
+        lines.append(_bar(c["percentile"], xp=xp) + f"  ({c['band']}, n={c['n']})")
     elif c.get("n", 0) > 0:
         lines.append(f"(only {c['n']} past session(s); need a few more to rank) +{xp} XP")
     else:

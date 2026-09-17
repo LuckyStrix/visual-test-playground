@@ -166,7 +166,15 @@ def play_sound(name, widget=None):
 
 
 def play_async(name, widget=None):
-    t = threading.Thread(target=play_sound, args=(name, widget), daemon=True)
+    p = sound_path(name)
+    if p is None:
+        if widget is not None:
+            try:
+                widget.bell()
+            except Exception:
+                pass
+        return None
+    t = threading.Thread(target=_play_sync, args=(p,), daemon=True)
     t.start()
     return t
 
@@ -187,9 +195,10 @@ def photo_image(path, size=None):
             from PIL import ImageTk as _Tk
         except ImportError:
             return None
-        img = _I.open(path)
-        if size is not None:
-            img = img.resize((int(size[0]), int(size[1])))
-        return _Tk.PhotoImage(img)
+        with _I.open(path) as src:
+            img = src.convert("RGB")
+            if size is not None:
+                img = img.resize((int(size[0]), int(size[1])))
+            return _Tk.PhotoImage(img)
     except Exception:
         return None
