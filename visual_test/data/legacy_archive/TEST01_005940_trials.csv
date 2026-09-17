@@ -1,0 +1,5 @@
+utc,participant,session,test_name,trial_num,stimulus_params,response,correct,reaction_time,rt_s
+2026-09-17T00:59:40.949948+00:00,TEST01,005940,Contrast Detection 2IFC,1,"{'contrast': 0.03162277660168379, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:41.487376+00:00,TEST01,005940,Contrast Detection 2IFC,2,"{'contrast': 0.07943282347242814, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:42.020367+00:00,TEST01,005940,Contrast Detection 2IFC,3,"{'contrast': 0.19952623149688792, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:42.551346+00:00,TEST01,005940,Contrast Detection 2IFC,4,"{'contrast': 0.5011872336272722, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,

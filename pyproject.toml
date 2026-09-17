@@ -1,0 +1,32 @@
+[project]
+name = "visual-test"
+version = "0.1.0"
+description = "EXPERIMENTAL playground for trying new things with AI models - NOT for real use (Tkinter + Pillow)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=10.0",
+    "scipy>=1.10",
+    "matplotlib>=3.6",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "ruff>=0.1", "mypy>=1.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["visual_test"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["visual_test.main", "visual_test.tests", "visual_test.calwizard"]
+disable_error_code = "no-redef"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]

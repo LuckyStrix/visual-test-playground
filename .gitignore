@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+visual_test/data/sessions/*
+visual_test/data/plots/*
+visual_test/data/incomplete/*.csv
+visual_test/data/incomplete/*.json
+*.png
+*.tmp

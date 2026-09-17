@@ -1,0 +1,9 @@
+utc,participant,session,test_name,trial_num,stimulus_params,response,correct,reaction_time,rt_s
+2026-09-17T00:59:00.091819+00:00,TEST01,005859,Contrast Detection 2IFC,1,"{'contrast': 0.03162277660168379, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:00.624952+00:00,TEST01,005859,Contrast Detection 2IFC,2,"{'contrast': 0.07943282347242814, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:01.158902+00:00,TEST01,005859,Contrast Detection 2IFC,3,"{'contrast': 0.19952623149688792, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:01.703285+00:00,TEST01,005859,Contrast Detection 2IFC,4,"{'contrast': 0.5011872336272722, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:02.233940+00:00,TEST01,005859,Contrast Detection 2IFC,5,"{'contrast': 1.0, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:02.764092+00:00,TEST01,005859,Contrast Detection 2IFC,1,"{'contrast': 0.03162277660168379, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:03.300673+00:00,TEST01,005859,Contrast Detection 2IFC,2,"{'contrast': 0.07943282347242814, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,
+2026-09-17T00:59:03.831138+00:00,TEST01,005859,Contrast Detection 2IFC,3,"{'contrast': 0.19952623149688792, 'size_px': 86, 'ppd': 43.0, 'sf_cpd': 2.0, 'size_deg': 2.0, 'sigma_deg': 0.8}",1,False,0.0,

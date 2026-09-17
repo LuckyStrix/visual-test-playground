@@ -1,0 +1,14 @@
+{
+  "participant_id": "P20260916_195333",
+  "session_id": "S195333",
+  "timestamp": "2026-09-16T19:53:33.546031",
+  "tests": [
+    {
+      "test_name": "Contrast Detection 2AFC",
+      "threshold_estimate": 0.15000000000000005,
+      "num_trials": 16,
+      "num_reversals": 6,
+      "timestamp_end": "2026-09-16T19:54:06.836293"
+    }
+  ]
+}
