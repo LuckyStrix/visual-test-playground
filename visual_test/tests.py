@@ -224,11 +224,68 @@ def wait_dismiss(win, valid=None, timeout=None):
     return ans[0] if ans else None
 
 
-def feedback(canvas, cx, cy, ok):
+def feedback(canvas, cx, cy, ok, streak=0, points=0, win=None):
     canvas.delete('all')
     canvas.create_text(cx, cy, text='Correct' if ok else 'Wrong',
                        fill='green' if ok else 'red', font=('Arial', 28, 'bold'))
+    if ok and streak >= 2:
+        canvas.create_text(cx, cy + 48, text=f'{streak}x streak  +{points}',
+                           fill='gold', font=('Arial', 16, 'bold'))
+    elif ok and points:
+        canvas.create_text(cx, cy + 48, text=f'+{points}',
+                           fill='gold', font=('Arial', 16, 'bold'))
     canvas.update()
+    try:
+        try:
+            from .assets import play_async
+        except ImportError:
+            from assets import play_async  # type: ignore[no-redef]
+        if streak >= 3 and ok:
+            play_async('streak', widget=win)
+        else:
+            play_async('correct' if ok else 'wrong', widget=win)
+    except Exception:
+        pass
+
+
+def arcade_feedback(test_obj, canvas, win, cx, cy, ok):
+    try:
+        try:
+            from . import game as _G
+        except ImportError:
+            import game as _G  # type: ignore[no-redef]
+        streak = _G.note_result(test_obj, bool(ok))
+        points = _G.points_for(bool(ok), streak)
+    except Exception:
+        streak, points = 0, 100 if ok else 0
+    feedback(canvas, cx, cy, bool(ok), streak=streak, points=points, win=win)
+    return streak, points
+
+
+def _streak_reset(handle):
+    try:
+        try:
+            from .game import reset_streak
+        except ImportError:
+            from game import reset_streak  # type: ignore[no-redef]
+        reset_streak(handle)
+    except Exception:
+        pass
+
+
+def arcade_toast(canvas, win, cx, cy, text, fill='yellow', size=18, sound=None):
+    canvas.delete('all')
+    canvas.create_text(cx, cy, text=text, fill=fill, font=('Arial', size, 'bold'))
+    canvas.update()
+    if sound:
+        try:
+            try:
+                from .assets import play_async
+            except ImportError:
+                from assets import play_async  # type: ignore[no-redef]
+            play_async(sound, widget=win)
+        except Exception:
+            pass
 
 
 def await_space(win, t0, timeout_s=1.5):
@@ -283,6 +340,7 @@ class Base:
                                rule=sp.get('rule', self.rule_default))
 
     def run_gui(self, canvas, win):
+        _streak_reset(self)
         levels, corrects = [], []
         n_main = n_stair = n_catch = n_practice = 0
         max_total = self.practice + self.n_trials * 3
@@ -429,7 +487,7 @@ class ContrastDetection2IFC(Base):
         r, rt = get_key(win, ['1', '2'])
         ok = (r == '1') == first
         if self.feedback:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'target_first': first}
 
@@ -462,7 +520,7 @@ class Acuity4AFC(Base):
         r, rt = get_key(win, ['Up', 'Right', 'Down', 'Left'])
         ok = self.map[r] == gap
         if self.feedback:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'logMAR': round(lvl, 3), 'gap_deg': gap, 'size_px': int(size_px)}
 
@@ -507,7 +565,7 @@ class ColorDiscrimination2IFC(Base):
         r, rt = get_key(win, ['1', '2'])
         ok = (r == '1') == first_diff
         if self.feedback:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(delta, 3), 'target_first': first_diff}
 
@@ -551,7 +609,7 @@ class StaticContrast(Base):
             self.stats.note(present, said_yes)
         ok = said_yes == present
         if self.feedback and not catch:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'present': present,
                         'said_yes': said_yes, 'catch': catch}
@@ -609,7 +667,7 @@ class StaticColorBullseye(Base):
         if main and not catch and truth is not None:
             self.stats.note(present=bool(truth), said_yes=said_redder)
         if self.feedback and not catch:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(delta, 2), 'center': cent_col, 'surround': surr_col,
                         'center_redder': truth, 'said_redder': said_redder, 'catch': catch}
@@ -662,7 +720,7 @@ class CollinearJudgment(Base):
             self.stats.note(not catch, not said_aligned)
         ok = said_aligned == (abs(offset_px) < 0.5)
         if self.feedback and not catch:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'offset_px': round(float(offset_px), 2), 'catch': catch,
                         'said_aligned': said_aligned}
@@ -718,7 +776,7 @@ class BrightnessMatch(Base):
             self.stats.note(not same_trial, not said_same)
         ok = said_same == same_trial
         if self.feedback and not catch:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(float(delta), 2), 'patch_left': left_p,
                         'patch_right': right_p, 'same_trial': same_trial,
@@ -766,7 +824,7 @@ class VernierJudgment(Base):
         r, rt = get_key(win, ['Left', 'Right'])
         ok = (r == 'Right') == (sign > 0)
         if self.feedback:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'offset_px': round(float(offset_px), 2), 'lower_right': bool(sign > 0),
                         'offset_clipped': bool(main and clipped)}
@@ -786,6 +844,7 @@ class Subitizing:
         self.rng = random.Random(self.seed)
 
     def run_gui(self, canvas, win):
+        _streak_reset(self)
         px = int(round(7.0 * self.ppd))
         dot_r = max(2, int(round(0.12 * self.ppd)))
         ns = []
@@ -812,7 +871,7 @@ class Subitizing:
                                       correct=ok, rt_s=round(rt, 3), response=int(r), n_dots=n,
                                       seed=seed, px=px)
                 if self.feedback:
-                    feedback(canvas, cx, cy, ok)
+                    arcade_feedback(self, canvas, win, cx, cy, ok)
                     wait_ms(win, 300)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
             record_abort(self.logger, self.name, e, kind=self.kind,
@@ -887,6 +946,7 @@ class HueOrdering:
             raise QuitExperiment("Participant pressed Escape")
 
     def run_gui(self, canvas, win):
+        _streak_reset(self)
         chips = hue_chips()
         lum = [0.299 * r + 0.587 * g + 0.114 * b for r, g, b in chips]
         truth = sorted(range(6), key=lambda i: lum[i])
@@ -927,10 +987,11 @@ class HueOrdering:
                 scores.append(score)
                 self.logger.log_trial(test=self.name, trial=t + 1, level=round(score, 3),
                                       correct=score == 0, rt_s='', order=list(map(int, picked)))
-                canvas.delete('all')
-                canvas.create_text(cx, cy, text=f'Score {score:.2f} (0 = perfect)',
-                                   fill='white', font=('Arial', 18))
-                win.update()
+                perfect = score == 0
+                msg = 'PERFECT! Score 0.00' if perfect else f'Score {score:.2f} (0 = perfect)'
+                arcade_toast(canvas, win, cx, cy, msg,
+                             fill='gold' if perfect else 'white', size=20,
+                             sound='correct' if perfect else None)
                 wait_ms(win, 800)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
             record_abort(self.logger, self.name, e, kind=self.kind,
@@ -1046,7 +1107,7 @@ class MaskedGabor(Base):
             self.stats.note(present, said)
         ok = said == present
         if self.feedback and not catch:
-            feedback(canvas, cx, cy, ok)
+            arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'present': present, 'dur_ms': dur,
                         'shown_ms': round(shown_ms, 1), 'mask_ms': round(mask_ms, 1),
@@ -1076,6 +1137,7 @@ class StaticReactionTime:
         self.rng = random.Random(self.seed)
 
     def run_gui(self, canvas, win):
+        _streak_reset(self)
         rts, misses, fas = [], 0, 0
         cx, cy = center(canvas)
         px = int(round(2.8 * self.ppd))
@@ -1116,10 +1178,8 @@ class StaticReactionTime:
                         raise QuitExperiment("Participant pressed Escape")
                     if early:
                         fas += 1
-                        canvas.delete('all')
-                        canvas.create_text(cx, cy, text='Too soon! Wait for the disc.',
-                                           fill='yellow', font=('Arial', 18))
-                        win.update()
+                        arcade_toast(canvas, win, cx, cy, 'Too soon! Wait for the disc.',
+                                     fill='yellow', size=18, sound='wrong')
                         wait_ms(win, 700)
                         continue
                     canvas.delete('all')
@@ -1141,13 +1201,20 @@ class StaticReactionTime:
                                               correct=False, rt_s=round(rt, 4), miss=False, fa=True,
                                               anticipatory=True,
                                               foreperiod_s=round(foreperiod, 3))
-                        canvas.delete('all')
-                        canvas.create_text(cx, cy, text='Too soon! Wait for the disc.',
-                                           fill='yellow', font=('Arial', 18))
-                        win.update()
+                        arcade_toast(canvas, win, cx, cy, 'Too soon! Wait for the disc.',
+                                     fill='yellow', size=18, sound='wrong')
                         wait_ms(win, 700)
                         continue
                     else:
+                        if rt < 0.30:
+                            try:
+                                try:
+                                    from .assets import play_async as _play
+                                except ImportError:
+                                    from assets import play_async as _play  # type: ignore[no-redef]
+                                _play('streak', widget=win)
+                            except Exception:
+                                pass
                         rts.append(rt)
                         self.logger.log_trial(test=self.name, trial=t + 1, level='n/a',
                                               correct=True, rt_s=round(rt, 4), miss=False, fa=False,

@@ -81,8 +81,8 @@ def show_centered(canvas, cx, cy, img):
 def stage_refresh(canvas, win, profile, n_frames=120):
     cx, cy = center(canvas)
     canvas.delete('all')
-    canvas.create_text(cx, cy, text='Measuring refresh rate...', fill='white',
-                       font=('Arial', 18))
+    canvas.create_text(cx, cy, text='⚡ VISOR TUNING 1/3 — sensing refresh...', fill='gold',
+                       font=('Arial', 18, 'bold'))
     win.update()
     hz, intervals = measure_refresh_hz(win.update, win.winfo_exists,
                                        n_frames=n_frames)
@@ -94,8 +94,8 @@ def stage_refresh(canvas, win, profile, n_frames=120):
     profile.frame_jitter_ms = summ['jitter']
     profile.missed_frames_pct = summ['missed_pct']
     canvas.delete('all')
-    canvas.create_text(cx, cy, text=f'Measured {hz} Hz', fill='white',
-                       font=('Arial', 18))
+    canvas.create_text(cx, cy, text=f'⚡ Visor tuned: {hz} Hz', fill='gold',
+                       font=('Arial', 18, 'bold'))
     win.update()
     wait_ms(win, 900)
     return hz
@@ -114,7 +114,7 @@ def stage_gamma(canvas, win, profile):
             canvas.create_text(
                 cx, cy + patch_px // 2 + 60, fill='white',
                 font=('Arial', 14), justify='center',
-                text=('Match the RIGHT patch to the halftone LEFT.\n'
+                text=('🎨 VISOR TUNING 2/3 — match the RIGHT patch to the halftone LEFT.\n'
                       f'Reference {i + 1}/{len(HALFTONE_LEVELS)} — start {ref}, now {level}\n'
                       'Hold still, squint if needed.\n'
                       'Up/Down = fine, Left/Right = coarse, Enter = match'))
@@ -137,8 +137,8 @@ def stage_steps(canvas, win, profile):
     show_centered(canvas, cx, cy - 30, step_row(patch_px, DARK_STEPS, 0))
     canvas.create_text(cx, cy + 120, fill='white', font=('Arial', 14),
                        justify='center',
-                       text=('Black steps on black: HOW MANY patches do you see?\n'
-                             'Press 0-9 (Esc quits)'))
+                        text=('🌑 VISOR TUNING 3/3 — black steps on black: HOW MANY patches?\n'
+                              'Press 0-9 (Esc quits)'))
     win.update()
     r, _ = get_key(win, [str(i) for i in range(10)])
     profile.black_step_visible = dimmest_visible_step(r, DARK_STEPS)
@@ -147,8 +147,8 @@ def stage_steps(canvas, win, profile):
     show_centered(canvas, cx, cy - 30, step_row(patch_px, LIGHT_STEPS, 255))
     canvas.create_text(cx, cy + 120, fill='white', font=('Arial', 14),
                        justify='center',
-                       text=('White steps on white: HOW MANY patches do you see?\n'
-                             'Press 0-9 (Esc quits)'))
+                        text=('⬜ VISOR TUNING 3/3 — white steps on white: HOW MANY patches?\n'
+                              'Press 0-9 (Esc quits)'))
     win.update()
     r, _ = get_key(win, [str(i) for i in range(10)])
     profile.white_step_visible = dimmest_visible_step(r, LIGHT_STEPS)

@@ -8,5 +8,7 @@ visual_test/data/display_profile.json
 visual_test/data/plots/*
 visual_test/data/incomplete/*.csv
 visual_test/data/incomplete/*.json
+visual_test/data/game_*.json
+visual_test/data/assets/
 *.png
 *.tmp

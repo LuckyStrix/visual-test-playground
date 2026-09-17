@@ -149,26 +149,39 @@ def open_viewer(root, data_dir, tk_mod=None):
     win.bind("<Escape>", lambda _e: win.destroy())
 
 
-def _bar(percentile, width=20):
+def _bar(percentile, width=20, xp=None):
     if percentile is None:
+        if xp:
+            return f"(+{xp} XP; not enough past sessions to rank)"
         return "(not enough past sessions to rank)"
     fill = int(round(percentile / 100.0 * width))
-    return "[" + "#" * fill + "-" * (width - fill) + f"] {percentile:.0f}% beat"
+    base = "[" + "★" * fill + "·" * (width - fill) + f"] {percentile:.0f}% beat"
+    if xp:
+        base += f"  +{xp} XP"
+    return base
 
 
 def _card_text(card):
     c = R.interpret(dict(card))
+    try:
+        try:
+            from . import game as _G
+        except ImportError:
+            import game as _G  # type: ignore[no-redef]
+        xp = _G.xp_for_card(card)
+    except Exception:
+        xp = 0
     lines = [f"-- {c['title']} --", c["what"]]
     if c.get("display"):
-        lines.append(f"Your result: {c['display']}")
+        lines.append(f"Your result: {c['display']}  (+{xp} XP)")
     else:
         lines.append("No score (aborted or incomplete).")
     if c.get("percentile") is not None:
-        lines.append(_bar(c["percentile"]) + f"  ({c['band']}, n={c['n']})")
+        lines.append(_bar(c["percentile"], xp=None) + f"  ({c['band']}, n={c['n']})")
     elif c.get("n", 0) > 0:
-        lines.append(f"(only {c['n']} past session(s); need a few more to rank)")
+        lines.append(f"(only {c['n']} past session(s); need a few more to rank) +{xp} XP")
     else:
-        lines.append("(no past sessions to compare against yet)")
+        lines.append(f"(no past sessions to compare against yet) +{xp} XP")
     for caveat in c.get("caveats", []):
         lines.append(f"! {caveat}")
     if "d_prime" in (c.get("summary") or {}):

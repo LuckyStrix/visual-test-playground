@@ -11,6 +11,8 @@ try:
                         QuitExperiment)
     from .datalogger import DataLogger
     from .calibration import compute_geometry, nyquist_ok, DisplayProfile, pooling_flags
+    from . import game as G
+    from . import assets as A
 except ImportError:
     from tests import (ContrastDetection2IFC, Acuity4AFC, ColorDiscrimination2IFC,
                        StaticContrast, StaticColorBullseye, StaticReactionTime,
@@ -19,6 +21,8 @@ except ImportError:
                        QuitExperiment)
     from datalogger import DataLogger
     from calibration import compute_geometry, nyquist_ok, DisplayProfile, pooling_flags
+    import game as G  # type: ignore[no-redef]
+    import assets as A  # type: ignore[no-redef]
 
 
 STAIR_DEFAULTS = {
@@ -121,19 +125,35 @@ class VisualTestApp:
             self.cal_lbl.set(f'Calibrated (saved): {s}')
 
     def build(self):
-        tk.Label(self.root, text='Visual System Test', font=('Arial', 18, 'bold')).pack(pady=8)
+        tk.Label(self.root, text='👁 VISION ARCADE', font=('Arial', 20, 'bold')).pack(pady=(8, 0))
         tk.Label(self.root,
-                 text='Setup: dim room, 60cm viewing distance, fullscreen stimulus window.\n'
-                      'Non-invasive screening only.',
+                 text='Experimental playground — lab-grade stimuli, arcade shell.\n'
+                      'Setup: dim room, 60cm viewing distance, fullscreen stimulus window.',
                  justify='center').pack()
+        self.game_hdr = tk.Frame(self.root)
+        self.game_hdr.pack(fill='x', padx=16, pady=(6, 0))
+        self.avatar_lbl = tk.Label(self.game_hdr)
+        self.avatar_lbl.pack(side='left', padx=(0, 8))
+        self.avatar_img = None
+        self.game_lbl = tk.StringVar(value='Level 0 — 0 XP')
+        tk.Label(self.game_hdr, textvariable=self.game_lbl,
+                 font=('Arial', 12, 'bold')).pack(side='left')
+        self.badge_lbl = tk.StringVar(value='')
+        tk.Label(self.game_hdr, textvariable=self.badge_lbl, fg='#b8860b',
+                 font=('Arial', 10)).pack(side='left', padx=8)
         pf = tk.Frame(self.root)
         pf.pack(fill='x', padx=16, pady=4)
-        tk.Label(pf, text='Profile name:', font=('Arial', 11, 'bold')).pack(side='left')
+        tk.Label(pf, text='Player:', font=('Arial', 11, 'bold')).pack(side='left')
         self.name_var = tk.StringVar(value=self.logger.participant_id)
         tk.Entry(pf, textvariable=self.name_var, width=22).pack(side='left', padx=6)
         tk.Button(pf, text='Use profile', command=self.switch_profile).pack(side='left')
         self.profile_lbl = tk.StringVar(value=f"Saving to: {self.logger.csv_path}")
         tk.Label(self.root, textvariable=self.profile_lbl, fg='#555').pack()
+        try:
+            A.ensure_assets()
+        except Exception:
+            pass
+        self.refresh_game_header()
         gf = tk.LabelFrame(self.root, text='Display geometry (for pixels-per-degree)')
         gf.pack(fill='x', padx=16, pady=4)
         self.diag_var = tk.DoubleVar(value=24.0)
@@ -181,6 +201,58 @@ class VisualTestApp:
         self.logger.set_participant(name)
         self.profile_lbl.set(f"Saving to: {self.logger.csv_path}")
         self.log(f'Profile: {self.logger.participant_id} -> {self.logger.csv_path}')
+        self.refresh_game_header()
+
+    def refresh_game_header(self):
+        try:
+            prof = G.load_profile(self.logger.participant_id, self.logger.data_dir)
+            xp = int(prof.get("xp", 0))
+            lvl, into, need = G.xp_into_level(xp)
+            self.game_lbl.set(f'Lv {lvl} {self.logger.participant_id} — {xp} XP '
+                              f'({into}/{need} to next)')
+            badges = prof.get("badges") or []
+            if badges:
+                names = [G.BADGES.get(b, b) for b in badges[:4]]
+                more = f' +{len(badges) - 4}' if len(badges) > 4 else ''
+                self.badge_lbl.set('🏅 ' + ' · '.join(names) + more)
+            else:
+                self.badge_lbl.set('No badges yet — play a mission!')
+            try:
+                ap = A.avatar_path(abs(hash(self.logger.participant_id)) % 4)
+                if ap:
+                    self.avatar_img = A.photo_image(ap, size=(40, 40))
+                    if self.avatar_img is not None:
+                        self.avatar_lbl.configure(image=self.avatar_img)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def best_ranks(self):
+        try:
+            from . import norms as N
+        except ImportError:
+            import norms as N  # type: ignore[no-redef]
+        best = {}
+        try:
+            for info in N.list_sessions(self.logger.data_dir):
+                try:
+                    doc = N.load_session(info["path"])
+                    if doc is None:
+                        continue
+                    group = N.collect_norms(self.logger.data_dir, exclude=info["path"])
+                    for card in N.score_session(doc, group):
+                        pct = card.get("percentile")
+                        if pct is None:
+                            continue
+                        k = card.get("kind")
+                        if k and pct > best.get(k, -1):
+                            best[k] = pct
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return best
 
     def update_ppd(self):
         try:
@@ -202,10 +274,17 @@ class VisualTestApp:
 
     def build_tests(self, f):
         self.test_vars = {}
+        best = self.best_ranks()
+        tk.Label(f, text='MISSIONS — pick your run', font=('Arial', 11, 'bold')).grid(
+            row=1, column=0, sticky='w')
         for i, (t, v) in enumerate(TEST_ORDER):
             var = tk.BooleanVar(value=(v == 'static_contrast'))
             self.test_vars[v] = var
-            tk.Checkbutton(f, text=t, variable=var).grid(row=i + 1, column=0, sticky='w')
+            icon, title, tag = A.mission_meta(v)
+            pct = best.get(v)
+            rank = f'  [best {pct:.0f}%]' if pct is not None else ''
+            tk.Checkbutton(f, text=f'{icon} {title}{rank} — {tag}',
+                           variable=var).grid(row=i + 2, column=0, sticky='w')
         tk.Label(f, text='Trials (max):').grid(row=0, column=1, sticky='e')
         self.n_var = tk.IntVar(value=40)
         tk.Spinbox(f, from_=20, to=80, textvariable=self.n_var, width=5).grid(row=1, column=1)
@@ -214,9 +293,9 @@ class VisualTestApp:
         self.fs_var = tk.BooleanVar(value=True)
         tk.Checkbutton(f, text='Fullscreen stimulus', variable=self.fs_var).grid(
             row=3, column=1, sticky='w')
-        tk.Label(f, text='Seed (blank=random):').grid(row=4, column=0, sticky='w')
+        tk.Label(f, text='Seed (blank=random):').grid(row=15, column=0, sticky='w')
         self.seed_var = tk.StringVar(value='')
-        tk.Entry(f, textvariable=self.seed_var, width=14).grid(row=4, column=1, sticky='w')
+        tk.Entry(f, textvariable=self.seed_var, width=14).grid(row=15, column=1, sticky='w')
         btns = tk.Frame(self.root)
         btns.pack(pady=8)
         tk.Button(btns, text='Select all', command=self.select_all).pack(side='left', padx=4)
@@ -442,6 +521,36 @@ class VisualTestApp:
         for var in self.test_vars.values():
             var.set(False)
 
+    def briefing(self, canvas, win, kind, i, total):
+        try:
+            from .tests import wait_ms
+        except ImportError:
+            from tests import wait_ms  # type: ignore[no-redef]
+        icon, title, tag = A.mission_meta(kind)
+        try:
+            A.play_async('click', widget=win)
+        except Exception:
+            pass
+        w = canvas.winfo_width() or 800
+        bar_w = int(w * 0.6)
+        x0 = (w - bar_w) // 2
+        canvas.delete('all')
+        canvas.create_text(w // 2, 200, text=f'{icon}  MISSION {i + 1}/{total}',
+                           font=('Arial', 26, 'bold'), fill='white')
+        canvas.create_text(w // 2, 250, text=f'{title} — {tag}',
+                           font=('Arial', 16), fill='gold')
+        canvas.create_rectangle(x0, 300, x0 + bar_w, 322, outline='white')
+        fill = int(bar_w * i / max(1, total))
+        if fill:
+            canvas.create_rectangle(x0, 300, x0 + fill, 322, fill='#2e7d32', outline='')
+        win.update()
+        for n in ('3', '2', '1', 'GO!'):
+            canvas.delete('count')
+            canvas.create_text(w // 2, 380, text=n, font=('Arial', 40, 'bold'),
+                               fill='yellow', tags='count')
+            win.update()
+            wait_ms(win, 350 if n != 'GO!' else 500)
+
     def start_session(self):
         want = (self.name_var.get() or '').strip()
         if want and want != self.logger.participant_id:
@@ -479,6 +588,10 @@ class VisualTestApp:
                 seed = None if seed_base is None else seed_base + i
                 test = self.make_test(kind, n, fb, seed=seed)
                 self.log(f'Starting {test.name} ({i + 1}/{len(kinds)})')
+                try:
+                    self.briefing(canvas, win, kind, i, len(kinds))
+                except Exception:
+                    pass
                 instr = INSTR[kind]
                 instr += f'\n\nTest {i + 1} of {len(kinds)}.'
                 if kind not in FIXED_TRIAL_KINDS:
@@ -530,18 +643,50 @@ class VisualTestApp:
     def show_session_report(self):
         try:
             try:
-                from .viewer import session_report_text
+                from .viewer import session_report_text, interpret_session
             except ImportError:
-                from viewer import session_report_text
+                from viewer import session_report_text, interpret_session  # type: ignore[no-redef]
             text = session_report_text(self.logger.json_path, self.logger.data_dir)
             if not text:
                 return
             self.log(text)
+            xp_line = ''
+            try:
+                got = interpret_session(self.logger.json_path, self.logger.data_dir)
+                cards = got["cards"] if got else []
+                calibrated = self.display_profile.summary() != 'not calibrated'
+                prof, gained, new_badges, leveled = G.add_session(
+                    self.logger.participant_id, self.logger.data_dir, cards,
+                    session_id=self.logger.session_id, calibrated=calibrated)
+                lvl = G.level_for_xp(prof.get("xp", 0))
+                self.logger.meta.update(game_xp=gained, game_level=lvl,
+                                        game_badges=list(prof.get("badges") or []))
+                try:
+                    self.logger.save()
+                except Exception:
+                    pass
+                self.refresh_game_header()
+                bits = [f'+{gained} XP  (Lv {lvl}, {prof.get("xp", 0)} total)']
+                if new_badges:
+                    bits.append('New badges: ' + ', '.join(
+                        G.BADGES.get(b, b) for b in new_badges))
+                if leveled:
+                    bits.append(f'LEVEL UP! Now Lv {lvl}')
+                    try:
+                        A.play_async('levelup', widget=self.root)
+                    except Exception:
+                        pass
+                xp_line = ' | '.join(bits)
+                self.log('Arcade: ' + xp_line)
+            except Exception as e:
+                self.log(f'XP skipped: {e}')
             rep = tk.Toplevel(self.root)
             rep.title('Session results (experimental, not clinical)')
             rep.geometry('680x560')
             body = tk.Text(rep, wrap='word')
             body.pack(fill='both', expand=True, padx=10, pady=10)
+            if xp_line:
+                body.insert('end', '🎮 ' + xp_line + '\n\n')
             body.insert('end', text)
             body.configure(state='disabled')
             tk.Button(rep, text='Close', command=rep.destroy).pack(pady=(0, 10))
