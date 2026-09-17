@@ -90,6 +90,7 @@ class VisualTestApp:
         self.ppd_var = None
         self.display_profile = DisplayProfile()
         self._session_running = False
+        self.name_var = tk.StringVar(value=self.logger.participant_id)
         self.load_profile()
         self.build()
         self.refresh_cal_label()
