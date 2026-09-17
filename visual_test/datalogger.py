@@ -107,7 +107,8 @@ class DataLogger:
                 if self._f.tell() == 0:
                     self._w.writeheader()
         elif set(rec.keys()) - set(self._w.fieldnames):
-            fields = list(self._w.fieldnames) + [k for k in rec.keys() if k not in self._w.fieldnames]
+            extra = [k for k in rec.keys() if k not in self._w.fieldnames]
+            fields = list(self._w.fieldnames) + extra
             self._rewrite_with_fields(fields)
 
     def _write_json(self):

@@ -61,8 +61,10 @@ TEST_ORDER = [
 
 INSTR = {
     'static_contrast': 'STATIC: stripes on screen now?\nKeys: Y = yes, N = no',
-    'static_color': 'STATIC: is the CENTER redder or bluer than the ring?\nKeys: R = redder, B = bluer',
-    'static_rt': 'STATIC: wait, then press SPACE the instant the disc pops up.\nNo memory, just react.',
+    'static_color': ('STATIC: is the CENTER redder or bluer than the ring?\n'
+                       'Keys: R = redder, B = bluer'),
+    'static_rt': ('STATIC: wait, then press SPACE the instant the disc pops up.\n'
+                  'No memory, just react.'),
     'collinear': 'STATIC: are the two white bars ALIGNED?\nKeys: Y = aligned, N = offset',
     'brightness': 'STATIC: are the two grey patches the SAME grey?\nKeys: Y = same, N = different',
     'vernier': 'STATIC: is the LOWER bar LEFT or RIGHT of the upper?\nKeys: Left / Right arrows',
@@ -83,11 +85,46 @@ class VisualTestApp:
         self.logger = DataLogger(participant_id='guest')
         self.ppd_var = None
         self.display_profile = DisplayProfile()
+        self.load_profile()
         self.build()
+        self.refresh_cal_label()
+
+    def profile_path(self):
+        import os
+        return os.path.join(os.path.dirname(self.logger.data_dir),
+                            'display_profile.json')
+
+    def load_profile(self):
+        import json
+        import os
+        try:
+            if os.path.exists(self.profile_path()):
+                with open(self.profile_path()) as f:
+                    doc = json.load(f)
+                self.display_profile = DisplayProfile.from_meta(doc)
+        except Exception:
+            pass
+
+    def save_profile(self):
+        import json
+        try:
+            with open(self.profile_path(), 'w') as f:
+                json.dump(self.display_profile.as_meta(), f, indent=2)
+        except Exception as e:
+            self.log(f'Profile save failed: {e}')
+
+    def refresh_cal_label(self):
+        s = self.display_profile.summary()
+        if s == 'not calibrated':
+            self.cal_lbl.set('Not calibrated — run before comparing across computers')
+        else:
+            self.cal_lbl.set(f'Calibrated (saved): {s}')
 
     def build(self):
         tk.Label(self.root, text='Visual System Test', font=('Arial', 18, 'bold')).pack(pady=8)
-        tk.Label(self.root, text='Setup: dim room, 60cm viewing distance, fullscreen stimulus window.\nNon-invasive screening only.',
+        tk.Label(self.root,
+                 text='Setup: dim room, 60cm viewing distance, fullscreen stimulus window.\n'
+                      'Non-invasive screening only.',
                  justify='center').pack()
         pf = tk.Frame(self.root)
         pf.pack(fill='x', padx=16, pady=4)
@@ -109,9 +146,11 @@ class VisualTestApp:
         tk.Spinbox(gf, from_=20, to=200, increment=5, textvariable=self.dist_var, width=6,
                    command=self.update_ppd).grid(row=0, column=3)
         tk.Label(gf, text='ppd:').grid(row=0, column=4, sticky='e')
-        tk.Label(gf, textvariable=self.ppd_var, font=('Arial', 10, 'bold')).grid(row=0, column=5, sticky='w')
+        tk.Label(gf, textvariable=self.ppd_var, font=('Arial', 10, 'bold')).grid(
+            row=0, column=5, sticky='w')
         self.ppd_note = tk.StringVar(value='')
-        tk.Label(gf, textvariable=self.ppd_note, fg='#a00').grid(row=1, column=0, columnspan=6, sticky='w')
+        tk.Label(gf, textvariable=self.ppd_note, fg='#a00').grid(
+            row=1, column=0, columnspan=6, sticky='w')
         tk.Label(gf, text='Resolution is read from the primary monitor only; '
                  'run the stimulus on that display or verify ppd manually.',
                  fg='#555').grid(row=2, column=0, columnspan=6, sticky='w')
@@ -127,6 +166,8 @@ class VisualTestApp:
                   command=self.run_calibration).pack(anchor='w', padx=6, pady=4)
         tk.Button(cf, text='Check session pooling',
                   command=self.check_pooling).pack(anchor='w', padx=6, pady=(0, 4))
+        tk.Button(cf, text='View results vs past sessions',
+                  command=self.open_results).pack(anchor='w', padx=6, pady=(0, 4))
         self.pool_lbl = tk.StringVar(value='')
         tk.Label(cf, textvariable=self.pool_lbl, fg='#555', justify='left',
                  wraplength=640).pack(anchor='w', padx=6)
@@ -171,7 +212,11 @@ class VisualTestApp:
         self.fb_var = tk.BooleanVar(value=True)
         tk.Checkbutton(f, text='Feedback', variable=self.fb_var).grid(row=2, column=1, sticky='w')
         self.fs_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(f, text='Fullscreen stimulus', variable=self.fs_var).grid(row=3, column=1, sticky='w')
+        tk.Checkbutton(f, text='Fullscreen stimulus', variable=self.fs_var).grid(
+            row=3, column=1, sticky='w')
+        tk.Label(f, text='Seed (blank=random):').grid(row=4, column=0, sticky='w')
+        self.seed_var = tk.StringVar(value='')
+        tk.Entry(f, textvariable=self.seed_var, width=14).grid(row=4, column=1, sticky='w')
         btns = tk.Frame(self.root)
         btns.pack(pady=8)
         tk.Button(btns, text='Select all', command=self.select_all).pack(side='left', padx=4)
@@ -179,7 +224,8 @@ class VisualTestApp:
         tk.Button(btns, text='START SESSION', font=('Arial', 12, 'bold'),
                   bg='#2e7d32', fg='white', command=self.start_session).pack(side='left', padx=8)
         self.status = tk.StringVar(value='Ready')
-        tk.Label(self.root, textvariable=self.status, relief='sunken', anchor='w').pack(side='bottom', fill='x')
+        tk.Label(self.root, textvariable=self.status, relief='sunken', anchor='w').pack(
+            side='bottom', fill='x')
         self.logbox = tk.Text(self.root, height=10, state='disabled')
         self.logbox.pack(fill='both', expand=True, padx=12, pady=6)
 
@@ -212,6 +258,8 @@ class VisualTestApp:
             run_wizard(canvas, win, self.display_profile)
             self.ask_display_settings()
             self.display_profile.calibrated_utc = datetime.now(timezone.utc).isoformat()
+            self.save_profile()
+            self.refresh_cal_label()
             self.logger.meta.update(self.display_profile.as_meta())
             try:
                 self.logger.save()
@@ -321,7 +369,31 @@ class VisualTestApp:
             self.display_profile.night_mode_off = bool(night_off.get())
             self.display_profile.notes = notes.get().strip()
 
-    def make_test(self, kind, n, fb):
+    def open_results(self):
+        try:
+            try:
+                from .viewer import open_viewer
+            except ImportError:
+                from viewer import open_viewer
+            open_viewer(self.root, self.logger.data_dir)
+        except Exception as e:
+            self.log(f'Results viewer failed: {e}')
+
+    def session_seed(self):
+        raw = (self.seed_var.get() or '').strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            self.log(f'Bad seed {raw!r}; using random.')
+            try:
+                messagebox.showwarning('Bad seed', f'{raw!r} is not an integer; using random.')
+            except Exception:
+                pass
+            return None
+
+    def make_test(self, kind, n, fb, seed=None):
         ppd = self.ppd
         self.logger.meta.update(display_ppd=round(ppd, 1),
                                 display_diag_in=float(self.diag_var.get()),
@@ -329,7 +401,7 @@ class VisualTestApp:
                                 screen_px=(self.root.winfo_screenwidth(),
                                            self.root.winfo_screenheight()),
                                 **self.display_profile.as_meta())
-        base = dict(n_trials=n, feedback=fb, practice_trials=3)
+        base = dict(n_trials=n, feedback=fb, practice_trials=3, seed=seed)
         sp = STAIR_DEFAULTS.get(kind)
         if kind == 'collinear':
             return CollinearJudgment('Collinearity Y/N', self.logger, ppd, dict(sp), **base)
@@ -381,11 +453,13 @@ class VisualTestApp:
                 pass
             return
         n, fb = self.n_var.get(), self.fb_var.get()
+        seed_base = self.session_seed()
         for kind in kinds:
             if kind not in FIXED_TRIAL_KINDS:
                 need = STAIR_DEFAULTS[kind]['n_reversals']
                 if n < need * 3:
-                    self.log(f'Warning: {n} trials is thin for {need} reversals; suggest >= {need * 3}')
+                    self.log(f'Warning: {n} trials thin for {need} reversals; '
+                             f'suggest >= {need * 3}')
         win = tk.Toplevel(self.root)
         win.title('Stimulus - press keys as instructed (Esc quits)')
         win.geometry('800x600')
@@ -400,7 +474,8 @@ class VisualTestApp:
         done_kinds = []
         try:
             for i, kind in enumerate(kinds):
-                test = self.make_test(kind, n, fb)
+                seed = None if seed_base is None else seed_base + i
+                test = self.make_test(kind, n, fb, seed=seed)
                 self.log(f'Starting {test.name} ({i + 1}/{len(kinds)})')
                 instr = INSTR[kind]
                 instr += f'\n\nTest {i + 1} of {len(kinds)}.'
@@ -441,6 +516,7 @@ class VisualTestApp:
             try:
                 self.logger.save()
                 self.log(f'Saved to {self.logger.csv_path}')
+                self.show_session_report()
             except Exception as e:
                 self.log(f'Save failed: {e}')
             try:
@@ -449,12 +525,36 @@ class VisualTestApp:
             except Exception:
                 pass
 
+    def show_session_report(self):
+        try:
+            try:
+                from .viewer import session_report_text
+            except ImportError:
+                from viewer import session_report_text
+            text = session_report_text(self.logger.json_path, self.logger.data_dir)
+            if not text:
+                return
+            self.log(text)
+            rep = tk.Toplevel(self.root)
+            rep.title('Session results (experimental, not clinical)')
+            rep.geometry('680x560')
+            body = tk.Text(rep, wrap='word')
+            body.pack(fill='both', expand=True, padx=10, pady=10)
+            body.insert('end', text)
+            body.configure(state='disabled')
+            tk.Button(rep, text='Close', command=rep.destroy).pack(pady=(0, 10))
+            rep.bind('<Escape>', lambda _e: rep.destroy())
+        except Exception as e:
+            self.log(f'Report skipped: {e}')
+
     def log_results(self, kind, test, out):
         if kind == 'static_rt':
             med, rts, misses, fas = out
             med_txt = f'{med * 1000:.0f} ms' if rts else 'no hits'
-            self.log(f'Done. Median RT={med_txt} over {len(rts)} hits, {misses} misses, {fas} false starts')
-            messagebox.showinfo('Done', f'{test.name}\nMedian RT: {med_txt}\nHits: {len(rts)} Misses: {misses}\nFalse starts: {fas}')
+            self.log(f'Done. Median RT={med_txt} over {len(rts)} hits, '
+                     f'{misses} misses, {fas} false starts')
+            messagebox.showinfo('Done', f'{test.name}\nMedian RT: {med_txt}\n'
+                                f'Hits: {len(rts)} Misses: {misses}\nFalse starts: {fas}')
         elif kind == 'subitize':
             acc, (hits, total) = out
             self.log(f'Done. {test.name} accuracy={acc:.3f} ({hits}/{total})')
@@ -467,7 +567,8 @@ class VisualTestApp:
         else:
             thresh, levels, corrects, reversals = out
             self.log(f'Done. Threshold={thresh:.3f} log units over {len(levels)} trials')
-            messagebox.showinfo('Done', f'{test.name}\nThreshold: {thresh:.3f} log units\nTrials: {len(levels)}')
+            messagebox.showinfo('Done', f'{test.name}\nThreshold: {thresh:.3f} log units\n'
+                                f'Trials: {len(levels)}')
 
     def wait_key(self, win):
         done, quit_ = [], []

@@ -85,6 +85,31 @@ later exports from that session. Use `comparability()` in
 mismatches before pooling data. Values are estimates + settings, not
 photometry — no absolute cd/m².
 
+## Results vs past sessions
+
+After each session a results window shows one card per test: what was
+measured, your score in plain units (% contrast, 20/x, ms, arcmin), and a
+percentile bar against this machine's past sessions (local only, nothing
+uploaded). Ranks appear once 5+ comparable past sessions exist; aborted or
+truncated runs are excluded from norms and flagged on the card. "View
+results vs past sessions" reopens any historic session. Every test writes a
+stable `kind` id into its JSON summary so scores stay comparable.
+
+Set an optional integer seed in the GUI for exact replay (blank = random).
+Display calibration is saved to `visual_test/data/display_profile.json` and
+reloaded on start.
+
+Headless exports:
+
+```bash
+python3 -m visual_test.export --list
+python3 -m visual_test.export --summary
+python3 -m visual_test.export --pooled pooled.csv
+python3 -m visual_test.export --report visual_test/data/sessions/<session>.json
+```
+
+All results are experimental playground estimates, not clinical measures.
+
 ## Dev
 
 ```bash

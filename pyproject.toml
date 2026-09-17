@@ -21,7 +21,8 @@ python_version = "3.10"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["visual_test.main", "visual_test.tests", "visual_test.calwizard"]
+module = ["visual_test.main", "visual_test.tests", "visual_test.calwizard",
+          "visual_test.viewer", "visual_test.export"]
 disable_error_code = "no-redef"
 
 [tool.ruff]

@@ -62,12 +62,20 @@ class YesNoStats:
         hr = self._said_yes_present / self._n_present if self._n_present else float('nan')
         far = self._said_yes_absent / self._n_absent if self._n_absent else float('nan')
         try:
-            hr_adj = (self._said_yes_present + 0.5) / (self._n_present + 1) if self._n_present else float('nan')
-            far_adj = (self._said_yes_absent + 0.5) / (self._n_absent + 1) if self._n_absent else float('nan')
+            if self._n_present:
+                hr_adj = (self._said_yes_present + 0.5) / (self._n_present + 1)
+            else:
+                hr_adj = float('nan')
+            if self._n_absent:
+                far_adj = (self._said_yes_absent + 0.5) / (self._n_absent + 1)
+            else:
+                far_adj = float('nan')
             dprime = NormalDist().inv_cdf(hr_adj) - NormalDist().inv_cdf(far_adj)
         except Exception:
             dprime = float('nan')
-        nz = lambda v: round(v, 3) if v == v else None
+
+        def nz(v):
+            return round(v, 3) if v == v else None
         return {'hit_rate': nz(hr), 'fa_rate': nz(far), 'd_prime': nz(dprime),
                 'unreliable_bias': bool(far == far and far > 0.3)}
 
@@ -79,13 +87,13 @@ def attach_yesno_summary(logger, stats):
     logger.save()
 
 
-def record_abort(logger, name, exc, **partial):
+def record_abort(logger, name, exc, kind=None, **partial):
     """Persist a partial summary when a run is aborted mid-test.
 
     Per-trial rows are already on disk; this ensures the JSON also records
     what happened instead of silently dropping the interrupted test."""
     try:
-        logger.end_test(test=name, aborted=True,
+        logger.end_test(test=name, kind=kind, aborted=True,
                         abort_reason=f"{type(exc).__name__}: {exc}"[:200],
                         **partial)
     except Exception:
@@ -253,6 +261,7 @@ def await_space(win, t0, timeout_s=1.5):
 class Base:
     rule_default = '3D1U'
     required_keys = ('start_val', 'step_sizes', 'min_val', 'max_val')
+    kind: str | None = None
 
     def __init__(self, name, logger, sp, n_trials=40, feedback=True, practice_trials=3,
                  seed=None):
@@ -307,7 +316,7 @@ class Base:
                 if done:
                     break
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e,
+            record_abort(self.logger, self.name, e, kind=self.kind,
                          n_trials=len(levels), n_catch=n_catch,
                          n_practice=n_practice,
                          n_reversals=len(self.stair.reversals),
@@ -319,7 +328,8 @@ class Base:
         truncated = len(self.stair.reversals) < self.stair.n_reversals
         clipped = bool(getattr(self, '_clipped_levels', []))
         rev_sd = self.stair.reversal_sd()
-        self.logger.end_test(test=self.name, threshold_log=round(th, 4),
+        self.logger.end_test(test=self.name, kind=self.kind,
+                             threshold_log=round(th, 4),
                              n_trials=len(levels), n_catch=n_catch,
                              n_practice=n_practice,
                              clipped_levels=clipped,
@@ -385,10 +395,12 @@ class Base:
 
 
 class ContrastDetection2IFC(Base):
+    kind = 'contrast'
     fit_guess = 0.5
     fit_log_levels = True
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -423,10 +435,12 @@ class ContrastDetection2IFC(Base):
 
 
 class Acuity4AFC(Base):
+    kind = 'acuity'
     fit_guess = 0.25
     fit_log_levels = True
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -454,10 +468,12 @@ class Acuity4AFC(Base):
 
 
 class ColorDiscrimination2IFC(Base):
+    kind = 'color'
     fit_guess = 0.5
     fit_log_levels = True
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -485,7 +501,8 @@ class ColorDiscrimination2IFC(Base):
             win.update()
             wait_ms(win, 400)
         canvas.delete('all')
-        canvas.create_text(cx, cy, text='1 = first had different colours   2 = second', fill='white', font=('Arial', 16))
+        canvas.create_text(cx, cy, text='1 = first had different colours   2 = second',
+                           fill='white', font=('Arial', 16))
         win.update()
         r, rt = get_key(win, ['1', '2'])
         ok = (r == '1') == first_diff
@@ -501,9 +518,11 @@ class StaticContrast(Base):
     Absent trials are catches (excluded from the staircase); the summary
     reports hit rate, false-alarm rate and d' alongside the threshold.
     Keys: Y = yes I see stripes, N = no."""
+    kind = 'static_contrast'
     fit_log_levels = True
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -554,11 +573,12 @@ class StaticColorBullseye(Base):
     Redder-center trials are treated as signal and bluer-center trials as
     noise, so the summary reports P(say redder | redder), P(say redder |
     bluer) and d' as a response-bias check."""
-
+    kind = 'static_color'
     fit_guess = 0.5
     fit_log_levels = True
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -580,7 +600,8 @@ class StaticColorBullseye(Base):
         canvas.delete('all')
         fixation(canvas, cx, cy)
         show_img(canvas, cx, cy, bullseye(self.px, cent_col, surr_col))
-        canvas.create_text(cx, cy + self.px, text='R = center REDDER   B = center BLUER', fill='white')
+        canvas.create_text(cx, cy + self.px, text='R = center REDDER   B = center BLUER',
+                           fill='white')
         win.update()
         r, rt = get_key(win, ['r', 'R', 'b', 'B'])
         said_redder = r.lower() == 'r'
@@ -608,8 +629,10 @@ class CollinearJudgment(Base):
 
     Aligned trials are catches (excluded from the staircase) that estimate
     the false-alarm rate; the staircase tracks offset trials only."""
+    kind = 'collinear'
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -660,8 +683,10 @@ class BrightnessMatch(Base):
     Same-patch trials are catches (excluded from the staircase); the
     staircase tracks different-patch trials only, i.e. the luminance delta
     needed to overcome the simultaneous-contrast illusion."""
+    kind = 'brightness'
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -683,7 +708,8 @@ class BrightnessMatch(Base):
         canvas.delete('all')
         fixation(canvas, cx, cy)
         show_img(canvas, cx, cy, brightness_pair(self.px, patch=left_p, patch_right=right_p))
-        canvas.create_text(cx, cy + self.px * 0.62, text='Y = same grey   N = different', fill='white')
+        canvas.create_text(cx, cy + self.px * 0.62, text='Y = same grey   N = different',
+                           fill='white')
         win.update()
         r, rt = get_key(win, ['y', 'Y', 'n', 'N'])
         said_same = r.lower() == 'y'
@@ -710,8 +736,10 @@ class BrightnessMatch(Base):
 
 class VernierJudgment(Base):
     """Static vernier — is the LOWER bar LEFT or RIGHT of the upper?"""
+    kind = 'vernier'
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -732,7 +760,8 @@ class VernierJudgment(Base):
         canvas.delete('all')
         fixation(canvas, cx, cy)
         show_img(canvas, cx, cy, vernier_bars(self.px, sign * offset_px))
-        canvas.create_text(cx, cy + self.px * 0.62, text='Left / Right arrow: lower bar?', fill='white')
+        canvas.create_text(cx, cy + self.px * 0.62, text='Left / Right arrow: lower bar?',
+                           fill='white')
         win.update()
         r, rt = get_key(win, ['Left', 'Right'])
         ok = (r == 'Right') == (sign > 0)
@@ -745,6 +774,7 @@ class VernierJudgment(Base):
 
 class Subitizing:
     """Static dot cloud, press 1-9 for how many. Accuracy + RT per numerosity."""
+    kind = 'subitize'
 
     def __init__(self, name, logger, n_trials=36, feedback=True, ppd=43.0, seed=None):
         self.name = name
@@ -785,16 +815,18 @@ class Subitizing:
                     feedback(canvas, cx, cy, ok)
                     wait_ms(win, 300)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e,
+            record_abort(self.logger, self.name, e, kind=self.kind,
                          n_completed=len([r for r in self.logger.trials
                                          if r.get('test') == self.name]),
                          n_hit=correct, ppd=self.ppd, seed=self.seed)
             raise
-        self.logger.end_test(test=self.name, accuracy=round(correct / self.n_trials, 3),
+        self.logger.end_test(test=self.name, kind=self.kind,
+                             accuracy=round(correct / self.n_trials, 3),
                              n_trials=self.n_trials, ppd=self.ppd, seed=self.seed)
         cx, cy = center(canvas)
         canvas.delete('all')
-        canvas.create_text(cx, cy, text=f'{self.name}\nAccuracy {correct}/{self.n_trials}\nPress any key',
+        canvas.create_text(cx, cy,
+                           text=f'{self.name}\nAccuracy {correct}/{self.n_trials}\nPress any key',
                            font=('Arial', 18), justify='center')
         win.update()
         wait_dismiss(win)
@@ -804,6 +836,7 @@ class Subitizing:
 class HueOrdering:
     """Six static hue chips in scrambled order; click them light→dark.
     Score = mean displacement from correct order."""
+    kind = 'hueorder'
 
     def __init__(self, name, logger, n_trials=6, ppd=43.0, seed=None):
         self.name = name
@@ -814,7 +847,8 @@ class HueOrdering:
         self.rng = random.Random(self.seed)
         self.np_rng = np.random.default_rng(self.seed)
 
-    def _wait_click(self, canvas, win, order, picked, x0, spacing, hit_r, cy, timeout=RESPONSE_TIMEOUT_S):
+    def _wait_click(self, canvas, win, order, picked, x0, spacing, hit_r, cy,
+                      timeout=RESPONSE_TIMEOUT_S):
         done, quit_ = [], []
 
         def click(e, order=order):
@@ -870,7 +904,8 @@ class HueOrdering:
 
                 def redraw():
                     canvas.delete('all')
-                    canvas.create_text(cx, cy - 160, text=f'Trial {t + 1}/{self.n_trials}: click chips LIGHTEST → DARKEST',
+                    msg = f'Trial {t + 1}/{self.n_trials}: click chips LIGHTEST → DARKEST'
+                    canvas.create_text(cx, cy - 160, text=msg,
                                        fill='white', font=('Arial', 14))
                     for i, ci in enumerate(order):
                         x = x0 + i * spacing
@@ -880,7 +915,9 @@ class HueOrdering:
                         tag = f'chip{i}'
                         canvas.create_image(x, cy, image=tk_img, tags=tag)
                         if ci in picked:
-                            canvas.create_text(x, cy + chip_px // 2 + 20, text=str(picked.index(ci) + 1), fill='yellow', font=('Arial', 18, 'bold'))
+                            canvas.create_text(x, cy + chip_px // 2 + 20,
+                                                 text=str(picked.index(ci) + 1),
+                                                 fill='yellow', font=('Arial', 18, 'bold'))
                     win.update()
                 redraw()
                 while len(picked) < 6:
@@ -891,16 +928,18 @@ class HueOrdering:
                 self.logger.log_trial(test=self.name, trial=t + 1, level=round(score, 3),
                                       correct=score == 0, rt_s='', order=list(map(int, picked)))
                 canvas.delete('all')
-                canvas.create_text(cx, cy, text=f'Score {score:.2f} (0 = perfect)', fill='white', font=('Arial', 18))
+                canvas.create_text(cx, cy, text=f'Score {score:.2f} (0 = perfect)',
+                                   fill='white', font=('Arial', 18))
                 win.update()
                 wait_ms(win, 800)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e,
+            record_abort(self.logger, self.name, e, kind=self.kind,
                          n_completed=len(scores), n_trials=self.n_trials,
                          ppd=self.ppd, seed=self.seed)
             raise
         m = float(np.mean(scores))
-        self.logger.end_test(test=self.name, mean_displacement=round(m, 3), n_trials=self.n_trials,
+        self.logger.end_test(test=self.name, kind=self.kind,
+                             mean_displacement=round(m, 3), n_trials=self.n_trials,
                              ppd=self.ppd, seed=self.seed)
         return m, scores
 
@@ -908,6 +947,7 @@ class HueOrdering:
 class SizeMatch:
     """Left disc fixed; Up/Down resizes right disc; Enter when equal.
     Reports bias = matched/reference - 1 per trial (illusion strength)."""
+    kind = 'sizematch'
 
     def __init__(self, name, logger, n_trials=10, ppd=43.0, seed=None):
         self.name = name
@@ -929,7 +969,8 @@ class SizeMatch:
                     canvas.delete('all')
                     fixation(canvas, cx, cy)
                     show_img(canvas, cx, cy, size_pair(px, ref, cmp_d))
-                    canvas.create_text(cx, cy + 240, text='Up/Down = resize right disc, Enter = equal',
+                    canvas.create_text(cx, cy + 240,
+                                         text='Up/Down = resize right disc, Enter = equal',
                                        fill='white')
                     win.update()
                     r, _ = get_key(win, ['Up', 'Down', 'Return'])
@@ -944,12 +985,13 @@ class SizeMatch:
                 self.logger.log_trial(test=self.name, trial=t + 1, level=round(bias, 4),
                                       correct=True, rt_s='', matched=round(cmp_d, 1))
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e,
+            record_abort(self.logger, self.name, e, kind=self.kind,
                          n_completed=len(biases), n_trials=self.n_trials,
                          ppd=self.ppd, seed=self.seed)
             raise
         m = float(np.mean(biases))
-        self.logger.end_test(test=self.name, mean_bias=round(m, 4), n_trials=self.n_trials,
+        self.logger.end_test(test=self.name, kind=self.kind,
+                             mean_bias=round(m, 4), n_trials=self.n_trials,
                              ppd=self.ppd, seed=self.seed)
         cx, cy = center(canvas)
         canvas.delete('all')
@@ -965,8 +1007,10 @@ class MaskedGabor(Base):
 
     Absent trials are catches (excluded from the staircase); the summary
     reports hit rate, false-alarm rate and d' alongside the threshold."""
+    kind = 'masked'
 
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40, feedback=True, practice_trials=3,
+    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
+                 feedback=True, practice_trials=3,
                  seed=None):
         super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
                          seed=seed)
@@ -992,7 +1036,8 @@ class MaskedGabor(Base):
         win.update()
         mask_ms = wait_ms(win, 200)
         canvas.delete('all')
-        canvas.create_text(cx, cy, text='Y = stripes   N = nothing', fill='white', font=('Arial', 20))
+        canvas.create_text(cx, cy, text='Y = stripes   N = nothing',
+                           fill='white', font=('Arial', 20))
         win.update()
         r, rt = get_key(win, ['y', 'Y', 'n', 'N'])
         said = r.lower() == 'y'
@@ -1020,6 +1065,7 @@ class MaskedGabor(Base):
 class StaticReactionTime:
     """Static simple reaction time: blank wait, disc pops up, press SPACE ASAP.
     No staircase; reports median RT and misses. Fixed trial count."""
+    kind = 'static_rt'
 
     def __init__(self, name, logger, n_trials=30, ppd=43.0, seed=None):
         self.name = name
@@ -1112,20 +1158,22 @@ class StaticReactionTime:
                 win.update()
                 wait_ms(win, 400)
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e,
+            record_abort(self.logger, self.name, e, kind=self.kind,
                          n_hit=len(rts), n_miss=misses, n_fa=fas,
                          n_trials=self.n_trials, ppd=self.ppd, seed=self.seed)
             raise
         med = float(np.median(rts)) if rts else float('nan')
         med_arg = round(med, 4) if rts else None
         n_miss = misses
-        self.logger.end_test(test=self.name, median_rt_s=med_arg,
+        self.logger.end_test(test=self.name, kind=self.kind,
+                             median_rt_s=med_arg,
                              n_trials=self.n_trials, n_miss=n_miss, n_hit=len(rts), n_fa=fas,
                              ppd=self.ppd, seed=self.seed)
         med_txt = f'{med * 1000:.0f} ms' if rts else 'no hits'
         canvas.delete('all')
-        canvas.create_text(cx, cy, text=f'{self.name}\nMedian RT {med_txt}\nMisses {misses} False starts {fas}\nPress any key',
-                           font=('Arial', 18), justify='center')
+        msg = (f'{self.name}\nMedian RT {med_txt}\nMisses {misses} '
+               f'False starts {fas}\nPress any key')
+        canvas.create_text(cx, cy, text=msg, font=('Arial', 18), justify='center')
         win.update()
         wait_dismiss(win)
         return med, rts, misses, fas

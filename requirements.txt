@@ -4,4 +4,4 @@ scipy==1.17.1
 matplotlib==3.6.3
 pytest==7.2.1
 mypy==1.0.1
-ruff>=0.1
+ruff==0.16.8

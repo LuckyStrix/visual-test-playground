@@ -90,20 +90,35 @@ def sp(s, mn, mx):
                 n_reversals=4, min_val=mn, max_val=mx, rule='3D1U')
 
 
+def _row(cls, kw, keys, np_val):
+    return (cls, kw, keys, np_val)
+
+
 STAIR_SUITE = [
-    (T.ContrastDetection2IFC, dict(name='C', ppd=43.0, staircase_params=sp(-1.0, -3.0, 0.0)), ['1', '2'], None),
-    (T.Acuity4AFC, dict(name='A', ppd=43.0, staircase_params=sp(0.3, -0.2, 1.0)), ['Up', 'Right', 'Down', 'Left'], None),
-    (T.ColorDiscrimination2IFC, dict(name='CD', ppd=43.0, staircase_params=sp(1.3, 0.3, 2.0)), ['1', '2'], None),
-    (T.StaticContrast, dict(name='SC', ppd=43.0, staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.1),
-    (T.StaticColorBullseye, dict(name='SB', ppd=43.0, staircase_params=sp(1.5, 0.5, 2.0)), ['r', 'b'], 0.9),
-    (T.CollinearJudgment, dict(name='CJ', ppd=43.0, staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.3),
-    (T.BrightnessMatch, dict(name='BM', ppd=43.0, staircase_params=sp(1.0, 0.0, 1.8)), ['y', 'n'], 0.7),
-    (T.VernierJudgment, dict(name='V', ppd=43.0, staircase_params=sp(-1.3, -2.5, 0.0)), ['Left', 'Right'], None),
-    (T.MaskedGabor, dict(name='M', ppd=43.0, staircase_params=sp(-0.5, -3.0, 0.0)), ['y', 'n'], 0.1),
+    _row(T.ContrastDetection2IFC, dict(name='C', ppd=43.0,
+                                       staircase_params=sp(-1.0, -3.0, 0.0)), ['1', '2'], None),
+    _row(T.Acuity4AFC, dict(name='A', ppd=43.0,
+                             staircase_params=sp(0.3, -0.2, 1.0)),
+         ['Up', 'Right', 'Down', 'Left'], None),
+    _row(T.ColorDiscrimination2IFC, dict(name='CD', ppd=43.0,
+                                         staircase_params=sp(1.3, 0.3, 2.0)), ['1', '2'], None),
+    _row(T.StaticContrast, dict(name='SC', ppd=43.0,
+                                staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.1),
+    _row(T.StaticColorBullseye, dict(name='SB', ppd=43.0,
+                                     staircase_params=sp(1.5, 0.5, 2.0)), ['r', 'b'], 0.9),
+    _row(T.CollinearJudgment, dict(name='CJ', ppd=43.0,
+                                   staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.3),
+    _row(T.BrightnessMatch, dict(name='BM', ppd=43.0,
+                                 staircase_params=sp(1.0, 0.0, 1.8)), ['y', 'n'], 0.7),
+    _row(T.VernierJudgment, dict(name='V', ppd=43.0,
+                                 staircase_params=sp(-1.3, -2.5, 0.0)), ['Left', 'Right'], None),
+    _row(T.MaskedGabor, dict(name='M', ppd=43.0,
+                             staircase_params=sp(-0.5, -3.0, 0.0)), ['y', 'n'], 0.1),
 ]
 
 
-@pytest.mark.parametrize("cls,kw,keys,np_val", STAIR_SUITE, ids=[c.__name__ for c, _, _, _ in STAIR_SUITE])
+@pytest.mark.parametrize("cls,kw,keys,np_val", STAIR_SUITE,
+                         ids=[c.__name__ for c, _, _, _ in STAIR_SUITE])
 def test_staircase_classes_headless(tmp_path, monkeypatch, cls, kw, keys, np_val):
     lg = DataLogger('TEST', data_dir=str(tmp_path))
     t = drive_seed(cls(logger=lg, n_trials=4, practice_trials=1, seed=7, **kw),

@@ -3,6 +3,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 visual_test/data/sessions/*
+!visual_test/data/sessions/.gitkeep
+visual_test/data/display_profile.json
 visual_test/data/plots/*
 visual_test/data/incomplete/*.csv
 visual_test/data/incomplete/*.json

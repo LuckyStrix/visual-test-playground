@@ -146,7 +146,9 @@ def collinear_segments(size_px, offset_px, gap_px=None, lum=235, bg=BG):
     c = s // 2
     bar_h, bar_w = max(3, s // 40), s // 3
     left = (np.abs(yy - c) <= bar_h // 2) & (xx >= c - gap_px - bar_w) & (xx <= c - gap_px)
-    right = (np.abs(yy - (c + int(round(offset_px)))) <= bar_h // 2) & (xx >= c + gap_px) & (xx <= c + gap_px + bar_w)
+    off = int(round(offset_px))
+    right = ((np.abs(yy - (c + off)) <= bar_h // 2) & (xx >= c + gap_px)
+             & (xx <= c + gap_px + bar_w))
     arr[left] = (_clip(lum),) * 3
     arr[right] = (_clip(lum),) * 3
     return Image.fromarray(arr)
@@ -178,7 +180,9 @@ def vernier_bars(size_px, offset_px, lum=235, bg=BG):
     c = s // 2
     w, h, gap = max(3, s // 50), s // 3, max(4, s // 40)
     upper = (np.abs(xx - c) <= w // 2) & (yy >= c - gap - h) & (yy <= c - gap)
-    lower = (np.abs(xx - (c + int(round(offset_px)))) <= w // 2) & (yy >= c + gap) & (yy <= c + gap + h)
+    off = int(round(offset_px))
+    lower = ((np.abs(xx - (c + off)) <= w // 2) & (yy >= c + gap)
+             & (yy <= c + gap + h))
     arr[upper] = (_clip(lum),) * 3
     arr[lower] = (_clip(lum),) * 3
     return Image.fromarray(arr)

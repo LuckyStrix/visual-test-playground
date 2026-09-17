@@ -84,7 +84,8 @@ def plot_staircase(levels, reversals, reversal_trials=None, title='', path='stai
 
 
 def plot_psychometric(fit, title='', path='psychometric.png'):
-    xs = np.array(fit['xs']); ys = np.array(fit['ys'])
+    xs = np.array(fit['xs'])
+    ys = np.array(fit['ys'])
     if xs.size == 0:
         raise ValueError("fit contains no data points")
     alpha = fit.get('alpha', float('nan'))

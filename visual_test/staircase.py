@@ -87,7 +87,10 @@ class Staircase:
             self.n_consec_incorrect = 0
         if move is not None:
             step = self._step()
-            new_val = min(self.current + step, self.max_val) if move == 'up' else max(self.current - step, self.min_val)
+            if move == 'up':
+                new_val = min(self.current + step, self.max_val)
+            else:
+                new_val = max(self.current - step, self.min_val)
             if new_val == self.current:
                 finished = (len(self.reversals) >= self.n_reversals
                             or self.trial_num >= self.n_trials_max)
