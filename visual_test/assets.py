@@ -85,14 +85,37 @@ def _write_badge(path, kind="star", size=48):
     cx = cy = size // 2
     r = size // 2 - 3
     pts = []
-    import math as _m
     for i in range(10):
         rr = r if i % 2 == 0 else r * 0.45
-        a = -_m.pi / 2 + i * _m.pi / 5
-        pts.append((cx + rr * _m.cos(a), cy + rr * _m.sin(a)))
+        a = -math.pi / 2 + i * math.pi / 5
+        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
     d.polygon(pts, fill=(255, 193, 7, 255), outline=(120, 70, 0, 255))
     img.convert("RGB").save(path)
     return True
+
+
+def _wav_ok(path):
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            return False
+        with wave.open(path, "rb") as w:
+            return w.getnchannels() > 0 and w.getnframes() > 0
+    except Exception:
+        return False
+
+
+def _img_ok(path):
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            return False
+        if Image is None:
+            return True
+        from PIL import Image as _I
+        with _I.open(path) as im:
+            im.verify()
+        return True
+    except Exception:
+        return False
 
 
 def ensure_assets():
@@ -104,17 +127,17 @@ def ensure_assets():
     for name, notes in SOUND_SPECS.items():
         p = os.path.join(d, name + ".wav")
         try:
-            if not os.path.exists(p) or os.path.getsize(p) == 0:
+            if not _wav_ok(p):
                 _write_tone(p, notes)
         except OSError:
             pass
     try:
         for i in range(4):
             p = os.path.join(d, f"avatar_{i}.png")
-            if not os.path.exists(p):
+            if not _img_ok(p):
                 _write_avatar(p, seed=i)
         p = os.path.join(d, "badge_star.png")
-        if not os.path.exists(p):
+        if not _img_ok(p):
             _write_badge(p)
     except OSError:
         pass
@@ -126,6 +149,22 @@ def sound_path(name):
     return p if os.path.exists(p) else None
 
 
+_PLAYER: list | None = None
+
+
+def _find_player():
+    global _PLAYER
+    if _PLAYER is None:
+        import shutil
+        for cmd in (["aplay", "-q"], ["paplay"], ["afplay"]):
+            if shutil.which(cmd[0]):
+                _PLAYER = cmd
+                break
+        else:
+            _PLAYER = []
+    return _PLAYER
+
+
 def _play_sync(path):
     try:
         import winsound
@@ -135,16 +174,23 @@ def _play_sync(path):
         pass
     except Exception:
         return False
-    import shutil
     import subprocess
-    for cmd in (["aplay", "-q", path], ["paplay", path], ["afplay", path]):
-        if shutil.which(cmd[0]):
-            try:
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return True
-            except Exception:
-                continue
-    return False
+    cmd = _find_player()
+    if not cmd:
+        return False
+    try:
+        proc = subprocess.Popen([*cmd, path], stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+    except Exception:
+        return False
+    try:
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    return True
 
 
 def play_sound(name, widget=None):
@@ -165,9 +211,22 @@ def play_sound(name, widget=None):
     return ok
 
 
+def _can_play():
+    try:
+        import importlib.util
+        if importlib.util.find_spec("winsound") is not None:
+            return True
+    except Exception:
+        pass
+    try:
+        return bool(_find_player())
+    except Exception:
+        return False
+
+
 def play_async(name, widget=None):
     p = sound_path(name)
-    if p is None:
+    if p is None or not _can_play():
         if widget is not None:
             try:
                 widget.bell()
@@ -184,7 +243,11 @@ def mission_meta(kind):
 
 
 def avatar_path(index=0):
-    p = os.path.join(asset_dir(), f"avatar_{int(index) % 4}.png")
+    try:
+        slot = int(index) % 4
+    except (TypeError, ValueError, OverflowError):
+        slot = 0
+    p = os.path.join(asset_dir(), f"avatar_{slot}.png")
     return p if os.path.exists(p) else None
 
 

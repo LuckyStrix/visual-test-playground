@@ -150,19 +150,30 @@ def open_viewer(root, data_dir, tk_mod=None):
 
 
 def _bar(percentile, width=20, xp=None):
-    if percentile is None:
+    try:
+        pct = float(percentile)
+    except (TypeError, ValueError, OverflowError):
+        pct = None
+    import math as _math
+    if pct is None or not _math.isfinite(pct):
         if xp:
             return f"(+{xp} XP; not enough past sessions to rank)"
         return "(not enough past sessions to rank)"
-    fill = int(round(percentile / 100.0 * width))
-    base = "[" + "★" * fill + "·" * (width - fill) + f"] {percentile:.0f}% beat"
+    pct = max(0.0, min(100.0, pct))
+    fill = max(0, min(int(width), int(round(pct / 100.0 * width))))
+    base = "[" + "★" * fill + "·" * (width - fill) + f"] {pct:.0f}% beat"
     if xp:
         base += f"  +{xp} XP"
     return base
 
 
 def _card_text(card):
-    c = R.interpret(dict(card))
+    if not isinstance(card, dict):
+        return "(unreadable result card)"
+    try:
+        c = R.interpret(dict(card))
+    except Exception:
+        return "(unreadable result card)"
     try:
         try:
             from . import game as _G
@@ -171,22 +182,30 @@ def _card_text(card):
         xp = _G.xp_for_card(card)
     except Exception:
         xp = 0
-    lines = [f"-- {c['title']} --", c["what"]]
+    xp_txt = f"  +{xp} XP" if xp else ""
+    lines = [f"-- {c.get('title', '?')} --", c.get("what", "A visual judgment task.")]
     if c.get("display"):
-        lines.append(f"Your result: {c['display']}")
+        lines.append(f"Your result: {c['display']}{xp_txt}")
     else:
         lines.append("No score (aborted or incomplete).")
+    try:
+        n = int(c.get("n", 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        n = 0
     if c.get("percentile") is not None:
-        lines.append(_bar(c["percentile"], xp=xp) + f"  ({c['band']}, n={c['n']})")
-    elif c.get("n", 0) > 0:
-        lines.append(f"(only {c['n']} past session(s); need a few more to rank) +{xp} XP")
+        lines.append(_bar(c["percentile"], xp=xp if xp else None)
+                     + f"  ({c.get('band')}, n={n})")
+    elif n > 0:
+        lines.append(f"(only {n} past session(s); need a few more to rank)"
+                     f"{xp_txt}")
     else:
-        lines.append(f"(no past sessions to compare against yet) +{xp} XP")
-    for caveat in c.get("caveats", []):
+        lines.append(f"(no past sessions to compare against yet){xp_txt}")
+    for caveat in c.get("caveats", []) or []:
         lines.append(f"! {caveat}")
-    if "d_prime" in (c.get("summary") or {}):
-        s = c["summary"]
+    summary = c.get("summary")
+    if isinstance(summary, dict) and "d_prime" in summary:
         lines.append(
-            f"bias: hit {s.get('hit_rate')} / FA {s.get('fa_rate')} / d' {s.get('d_prime')}"
+            f"bias: hit {summary.get('hit_rate')} / FA {summary.get('fa_rate')} / "
+            f"d' {summary.get('d_prime')}"
         )
     return "\n".join(lines)
