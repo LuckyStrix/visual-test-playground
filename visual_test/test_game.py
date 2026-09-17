@@ -52,7 +52,7 @@ def test_streak_points():
 
 def test_badges():
     cards = [card(pct=95.0, summary={"hit_rate": 0.9, "fa_rate": 0.05,
-                                     "reversal_sd": 0.1})]
+                                     "reversal_sd": 0.1, "n_reversals": 8})]
     badges = G.badges_for_session(cards, calibrated=True)
     assert "top10" in badges
     assert "sharpshooter" in badges
@@ -182,7 +182,7 @@ def test_viewer_bar_clamps_bad_input():
     assert _card_text(None) == "(unreadable result card)"
     assert _card_text("str") == "(unreadable result card)"
     assert _card_text({"summary": "bad"}) == "(unreadable result card)"
-    assert "(None, n=0)" in _card_text({"display": None, "percentile": 80.0})
+    assert "(unranked, n=0)" in _card_text({"display": None, "percentile": 80.0})
     assert "+0 XP" not in _card_text({})
 
 
@@ -198,6 +198,119 @@ def test_assets_rewrite_corrupt(tmp_path, monkeypatch):
     import wave
     with wave.open(p, "rb") as w:
         assert w.getnframes() > 0
+
+
+def test_replay_same_session_id_no_double_count(tmp_path):
+    cards = [card(pct=80.0, band="Above average")]
+    prof, gained, _, _ = G.add_session("P1", str(tmp_path), cards, session_id="s1")
+    assert gained > 0
+    prof2, gained2, new2, leveled2 = G.add_session(
+        "P1", str(tmp_path), cards, session_id="s1")
+    assert gained2 == 0
+    assert new2 == []
+    assert leveled2 is False
+    assert prof2["sessions"] == prof["sessions"] == 1
+    assert prof2["xp"] == prof["xp"]
+
+
+def test_badge_value_consistency_no_free_marathon():
+    ghost = [{"display": "x", "value": None} for _ in range(13)]
+    assert G.badges_for_session(ghost) == []
+    assert G.xp_for_card({"display": "x", "value": None}) == 0
+
+
+def test_steady_needs_reversals():
+    thin = [card(pct=80.0, summary={"reversal_sd": 0.1})]
+    assert "steady" not in G.badges_for_session(thin)
+    solid = [card(pct=80.0, summary={"reversal_sd": 0.1, "n_reversals": 8})]
+    assert "steady" in G.badges_for_session(solid)
+
+
+def test_participant_sanitized_not_crash():
+    import re
+    p = G.profile_path(12345, "/tmp")
+    assert p.endswith(".json")
+    for bad in (["x"], None, 12345, b"bytes", object()):
+        name = G.load_profile(bad, "/tmp")["participant"]
+        assert re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name), name
+
+
+def test_streak_none_safe():
+    assert G.note_result(None, True) == 1
+    assert G.streak_of(None) == 0
+    G.reset_streak(None)
+
+
+def test_save_profile_failure_returns_none(tmp_path, monkeypatch):
+    import json as _json
+    monkeypatch.setattr(_json, "dump", lambda *a, **k: (_ for _ in ()).throw(
+        TypeError("not serializable")))
+    assert G.save_profile("P1", str(tmp_path), {"xp": 1}) is None
+
+
+def test_sound_path_rejects_traversal(tmp_path, monkeypatch):
+    from . import assets as A
+    monkeypatch.setattr(A, "asset_dir", lambda: str(tmp_path))
+    assert A.sound_path("../../etc/passwd") is None
+    assert A.sound_path("correct;rm") is None
+    assert A.sound_path(None) is None
+
+
+def test_play_async_dedups_and_recovers(monkeypatch):
+    import threading as _th
+    from . import assets as A
+    gate = _th.Event()
+    calls = []
+    def slow(path):
+        calls.append(path)
+        gate.wait(timeout=10)
+        return True
+    monkeypatch.setattr(A, "_play_sync", slow)
+    monkeypatch.setattr(A, "_can_play", lambda: True)
+    monkeypatch.setattr(A, "sound_path", lambda n: "/tmp/x.wav")
+    t1 = A.play_async("correct")
+    t2 = A.play_async("correct")
+    assert t1 is not None
+    assert t2 is None
+    gate.set()
+    if t1 is not None:
+        t1.join(timeout=5)
+    t3 = A.play_async("correct")
+    assert t3 is not None
+    if t3 is not None:
+        t3.join(timeout=5)
+
+
+def test_viewer_entry_and_caveats_guards():
+    from .viewer import _entry_text, _card_text
+    assert _entry_text({}) != ""
+    assert _entry_text(None) == "(unreadable session)"
+    assert "(unranked, n=0)" in _card_text({"display": None, "percentile": 80.0})
+    c = {"kind": "static_rt", "value": 1.0, "display": "1%",
+         "percentile": None, "n": 0, "summary": {"d_prime": 1.5},
+         "caveats": "bad"}
+    text = _card_text(dict(c))
+    assert "bias: hit" in text
+    assert "! b" not in text
+
+
+def test_norms_malformed_tests_and_self_exclusion(tmp_path):
+    import json as _json
+    from . import norms as N
+    bad = tmp_path / "bad.json"
+    bad.write_text(_json.dumps({"participant": "p", "session": "s",
+                                "tests": {"not": "a list"}}))
+    assert N.list_sessions(str(tmp_path))
+    assert N.collect_norms(str(tmp_path)) == {}
+    good = tmp_path / "good.json"
+    good.write_text(_json.dumps({
+        "participant": "p", "session": "s2",
+        "tests": [{"test": "Static Reaction Time", "kind": "static_rt",
+                   "median_rt_s": 0.25, "n_trials": 10}]}))
+    rel = str(good)
+    abs_p = str(good.resolve())
+    assert N.collect_norms(str(tmp_path), exclude=rel) == {}
+    assert N.collect_norms(str(tmp_path), exclude=abs_p) == {}
 
 
 def test_audio_falls_back_when_no_player(tmp_path, monkeypatch):

@@ -45,52 +45,107 @@ def asset_dir():
 
 
 def _write_tone(path, notes, rate=22050):
+    try:
+        rate = int(rate)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if rate <= 0 or rate > 192000:
+        return False
     frames = bytearray()
-    for freq, dur in notes:
-        n = max(1, int(rate * dur))
-        for i in range(n):
-            env = 1.0 - (i / n)
-            s = int(32767 * 0.5 * env * math.sin(2 * math.pi * freq * i / rate))
-            frames += struct.pack("<h", max(-32768, min(32767, s)))
-        gap = int(rate * 0.02)
-        frames += b"\x00\x00" * gap
-    with wave.open(path, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(rate)
-        w.writeframes(bytes(frames))
+    try:
+        for freq, dur in notes:
+            try:
+                f = float(freq)
+                d = float(dur)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not math.isfinite(f) or not math.isfinite(d):
+                continue
+            f = max(20.0, min(20000.0, f))
+            d = max(0.005, min(5.0, d))
+            n = max(1, min(int(rate * d), rate * 5))
+            for i in range(n):
+                env = 1.0 - (i / n)
+                s = int(32767 * 0.5 * env * math.sin(2 * math.pi * f * i / rate))
+                frames += struct.pack("<h", max(-32768, min(32767, s)))
+            gap = int(rate * 0.02)
+            frames += b"\x00\x00" * gap
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if not frames:
+        return False
+    try:
+        tmp = path + ".tmp"
+        with wave.open(tmp, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(bytes(frames))
+        os.replace(tmp, path)
+    except (OSError, wave.Error):
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return False
+    return True
 
 
 def _write_avatar(path, seed=0, size=64):
     if Image is None:
         return False
-    color = _AVATAR_COLORS[seed % len(_AVATAR_COLORS)]
-    img = Image.new("RGB", (size, size), (30, 30, 34))
-    d = ImageDraw.Draw(img)
-    d.ellipse([6, 6, size - 6, size - 6], fill=color)
-    cx0 = size // 2
-    d.ellipse([cx0 - 10, cx0 - 14, cx0 + 10, cx0 + 6], fill=(245, 245, 245))
-    d.ellipse([cx0 - 4, cx0 - 10, cx0 + 4, cx0 - 2], fill=(20, 20, 20))
-    d.arc([cx0 - 14, cx0 - 2, cx0 + 14, cx0 + 16], 20, 160,
-          fill=(245, 245, 245), width=3)
-    img.save(path)
+    try:
+        slot = int(seed) % len(_AVATAR_COLORS)
+    except (TypeError, ValueError, OverflowError):
+        slot = 0
+    color = _AVATAR_COLORS[slot]
+    try:
+        img = Image.new("RGB", (size, size), (30, 30, 34))
+        d = ImageDraw.Draw(img)
+        d.ellipse([6, 6, size - 6, size - 6], fill=color)
+        cx0 = size // 2
+        d.ellipse([cx0 - 10, cx0 - 14, cx0 + 10, cx0 + 6], fill=(245, 245, 245))
+        d.ellipse([cx0 - 4, cx0 - 10, cx0 + 4, cx0 - 2], fill=(20, 20, 20))
+        d.arc([cx0 - 14, cx0 - 2, cx0 + 14, cx0 + 16], 20, 160,
+              fill=(245, 245, 245), width=3)
+        tmp = path + ".tmp"
+        img.save(tmp)
+        os.replace(tmp, path)
+    except (OSError, ValueError):
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return False
     return True
 
 
 def _write_badge(path, kind="star", size=48):
     if Image is None:
         return False
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    cx = cy = size // 2
-    r = size // 2 - 3
-    pts = []
-    for i in range(10):
-        rr = r if i % 2 == 0 else r * 0.45
-        a = -math.pi / 2 + i * math.pi / 5
-        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
-    d.polygon(pts, fill=(255, 193, 7, 255), outline=(120, 70, 0, 255))
-    img.convert("RGB").save(path)
+    try:
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        cx = cy = size // 2
+        r = size // 2 - 3
+        pts = []
+        for i in range(10):
+            rr = r if i % 2 == 0 else r * 0.45
+            a = -math.pi / 2 + i * math.pi / 5
+            pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+        d.polygon(pts, fill=(255, 193, 7, 255), outline=(120, 70, 0, 255))
+        tmp = path + ".tmp"
+        img.convert("RGB").save(tmp)
+        os.replace(tmp, path)
+    except (OSError, ValueError):
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return False
     return True
 
 
@@ -145,6 +200,8 @@ def ensure_assets():
 
 
 def sound_path(name):
+    if not isinstance(name, str) or name not in SOUND_SPECS:
+        return None
     p = os.path.join(asset_dir(), name + ".wav")
     return p if os.path.exists(p) else None
 
@@ -190,7 +247,12 @@ def _play_sync(path):
             proc.kill()
         except Exception:
             pass
-    return True
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+        return False
+    return proc.returncode == 0
 
 
 def play_sound(name, widget=None):
@@ -224,6 +286,21 @@ def _can_play():
         return False
 
 
+_ACTIVE_SOUNDS: set = set()
+_SOUND_LOCK = threading.Lock()
+
+
+def _play_guarded(name, path):
+    try:
+        _play_sync(path)
+    finally:
+        try:
+            with _SOUND_LOCK:
+                _ACTIVE_SOUNDS.discard(name)
+        except Exception:
+            pass
+
+
 def play_async(name, widget=None):
     p = sound_path(name)
     if p is None or not _can_play():
@@ -233,13 +310,31 @@ def play_async(name, widget=None):
             except Exception:
                 pass
         return None
-    t = threading.Thread(target=_play_sync, args=(p,), daemon=True)
-    t.start()
+    try:
+        with _SOUND_LOCK:
+            if name in _ACTIVE_SOUNDS:
+                return None
+            _ACTIVE_SOUNDS.add(name)
+    except Exception:
+        return None
+    try:
+        t = threading.Thread(target=_play_guarded, args=(name, p), daemon=True)
+        t.start()
+    except Exception:
+        try:
+            with _SOUND_LOCK:
+                _ACTIVE_SOUNDS.discard(name)
+        except Exception:
+            pass
+        return None
     return t
 
 
 def mission_meta(kind):
-    return MISSION_META.get(kind, ("•", kind, ""))
+    try:
+        return MISSION_META.get(kind, ("•", kind, ""))
+    except TypeError:
+        return ("•", str(kind), "")
 
 
 def avatar_path(index=0):
@@ -261,7 +356,12 @@ def photo_image(path, size=None):
         with _I.open(path) as src:
             img = src.convert("RGB")
             if size is not None:
-                img = img.resize((int(size[0]), int(size[1])))
+                try:
+                    w = max(1, min(int(float(size[0])), 512))
+                    h = max(1, min(int(float(size[1])), 512))
+                except (TypeError, ValueError, OverflowError):
+                    return None
+                img = img.resize((w, h))
             return _Tk.PhotoImage(img)
     except Exception:
         return None

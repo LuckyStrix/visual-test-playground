@@ -11,12 +11,17 @@ from . import results as R
 
 
 def interpret_session(path, data_dir):
-    doc = N.load_session(path)
-    if doc is None:
+    try:
+        if not isinstance(path, str) or not isinstance(data_dir, str):
+            return None
+        doc = N.load_session(path)
+        if doc is None:
+            return None
+        group = N.collect_norms(data_dir, exclude=path)
+        cards = R.summarize_session(N.score_session(doc, group))["cards"]
+        return {"path": path, "doc": doc, "cards": cards}
+    except Exception:
         return None
-    group = N.collect_norms(data_dir, exclude=path)
-    cards = R.summarize_session(N.score_session(doc, group))["cards"]
-    return {"path": path, "doc": doc, "cards": cards}
 
 
 def session_report_text(path, data_dir):
@@ -56,10 +61,22 @@ def _sessions_in(dirs):
 
 
 def _entry_text(s):
-    base = f"{s['participant']} — {s['session']} ({s['n_tests']} tests)"
-    if s.get("source") and s["source"] not in ("sessions",):
-        base += f" [{s['source']}]"
-    return base
+    if not isinstance(s, dict):
+        return "(unreadable session)"
+    try:
+        part = s.get("participant", "?")
+        sess = s.get("session", "?")
+        n = s.get("n_tests", "?")
+        try:
+            n = int(n)
+        except (TypeError, ValueError, OverflowError):
+            n = "?"
+        base = f"{part} — {sess} ({n} tests)"
+        if s.get("source") and s["source"] not in ("sessions",):
+            base += f" [{s['source']}]"
+        return base
+    except Exception:
+        return "(unreadable session)"
 
 
 def open_viewer(root, data_dir, tk_mod=None):
@@ -106,7 +123,15 @@ def open_viewer(root, data_dir, tk_mod=None):
         if not sessions or idx is None:
             render("No sessions recorded yet. Run a session first.")
             return
-        info = sessions[idx]
+        try:
+            i = int(idx)
+        except (TypeError, ValueError, OverflowError):
+            render("No sessions recorded yet. Run a session first.")
+            return
+        if i < 0 or i >= len(sessions):
+            render("That session is no longer listed — press Refresh.")
+            return
+        info = sessions[i]
         own_dir = os.path.dirname(info["path"])
         got = interpret_session(info["path"], own_dir)
         if got is None:
@@ -192,15 +217,23 @@ def _card_text(card):
         n = int(c.get("n", 0) or 0)
     except (TypeError, ValueError, OverflowError):
         n = 0
+    band = c.get("band") or "unranked"
     if c.get("percentile") is not None:
         lines.append(_bar(c["percentile"], xp=xp if xp else None)
-                     + f"  ({c.get('band')}, n={n})")
+                     + f"  ({band}, n={n})")
     elif n > 0:
         lines.append(f"(only {n} past session(s); need a few more to rank)"
                      f"{xp_txt}")
     else:
         lines.append(f"(no past sessions to compare against yet){xp_txt}")
-    for caveat in c.get("caveats", []) or []:
+    caveats = c.get("caveats", [])
+    if isinstance(caveats, str):
+        caveats = [caveats]
+    try:
+        items = list(caveats or [])
+    except TypeError:
+        items = []
+    for caveat in items:
         lines.append(f"! {caveat}")
     summary = c.get("summary")
     if isinstance(summary, dict) and "d_prime" in summary:

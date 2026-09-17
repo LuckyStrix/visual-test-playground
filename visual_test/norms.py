@@ -171,7 +171,9 @@ def list_sessions(data_dir):
         doc = load_session(path)
         if doc is None:
             continue
-        tests = doc.get("tests") or []
+        tests = doc.get("tests")
+        if not isinstance(tests, list):
+            tests = []
         try:
             mtime = os.path.getmtime(path)
         except OSError:
@@ -194,13 +196,24 @@ def list_sessions(data_dir):
 def collect_norms(data_dir, exclude=None):
     """Map kind -> list of past scores, skipping aborted/truncated runs."""
     norms = {}
+    try:
+        excluded = os.path.abspath(exclude) if exclude else None
+    except Exception:
+        excluded = exclude
     for info in list_sessions(data_dir):
-        if info["path"] == exclude:
+        try:
+            same = os.path.abspath(info["path"]) == excluded
+        except Exception:
+            same = info["path"] == exclude
+        if excluded is not None and same:
             continue
         doc = load_session(info["path"])
         if doc is None:
             continue
-        for s in doc.get("tests") or []:
+        tests = doc.get("tests")
+        if not isinstance(tests, list):
+            continue
+        for s in tests:
             if not isinstance(s, dict):
                 continue
             if s.get("aborted") or s.get("truncated"):

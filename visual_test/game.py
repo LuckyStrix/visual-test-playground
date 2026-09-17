@@ -9,6 +9,7 @@ norms stay pure.
 import json
 import math
 import os
+import threading
 from datetime import datetime, timezone
 
 try:
@@ -34,7 +35,7 @@ def _safe_xp(xp):
     n = _num(xp)
     if n is None:
         return 0
-    return max(0, min(int(n), 10 ** 12))
+    return max(0, min(int(n), MAX_STORED_XP))
 
 
 def level_for_xp(xp):
@@ -101,7 +102,8 @@ def badges_for_session(cards, calibrated=False):
     except TypeError:
         items = []
     cards = [c for c in items if isinstance(c, dict)]
-    scored = [c for c in cards if c.get("display")]
+    scored = [c for c in cards
+              if c.get("display") is not None and c.get("value") is not None]
     try:
         calibrated = bool(calibrated)
     except Exception:
@@ -119,8 +121,13 @@ def badges_for_session(cards, calibrated=False):
             out.append("sharpshooter")
             break
     for c in scored:
-        sd = _num(_card_summary(c).get("reversal_sd"))
-        if sd is not None and sd < 0.15:
+        s = _card_summary(c)
+        sd = _num(s.get("reversal_sd"))
+        try:
+            nrev = int(s.get("n_reversals", 0) or 0)
+        except (TypeError, ValueError, OverflowError):
+            nrev = 0
+        if sd is not None and sd < 0.15 and nrev >= 4:
             out.append("steady")
             break
     if len(scored) >= FULL_BATTERY_N:
@@ -150,20 +157,34 @@ def profile_path(participant, data_dir):
     root = os.path.abspath(data_dir)
     if os.path.basename(os.path.normpath(root)) == "sessions":
         root = os.path.dirname(root)
-    return os.path.join(root, f"game_{safe_name(participant)}.json")
+    return os.path.join(root, f"game_{_safe_participant(participant)}.json")
+
+
+MAX_STORED_XP = 10 ** 12
 
 
 def _coerce_int(v):
     try:
-        return max(0, int(float(v)))
+        return max(0, min(int(float(v)), MAX_STORED_XP))
     except (TypeError, ValueError, OverflowError):
         return 0
+
+
+def _safe_participant(participant):
+    try:
+        if isinstance(participant, bytes):
+            participant = participant.decode("utf-8", "replace")
+        if not isinstance(participant, str):
+            participant = str(participant)
+        return safe_name(participant)
+    except Exception:
+        return "anon"
 
 
 def _coerce_profile(doc, participant):
     if not isinstance(doc, dict):
         doc = {}
-    doc["participant"] = safe_name(participant)
+    doc["participant"] = _safe_participant(participant)
     doc["xp"] = _coerce_int(doc.get("xp", 0))
     doc["sessions"] = _coerce_int(doc.get("sessions", 0))
     badges = doc.get("badges")
@@ -186,33 +207,47 @@ def _coerce_profile(doc, participant):
 
 
 def load_profile(participant, data_dir):
-    path = profile_path(participant, data_dir)
+    name = _safe_participant(participant)
+    try:
+        path = profile_path(name, data_dir)
+    except Exception:
+        return {"participant": name, "xp": 0, "badges": [],
+                "sessions": 0, "last_session_utc": None, "history": []}
     try:
         with open(path) as f:
             doc = json.load(f)
         if isinstance(doc, dict):
-            return _coerce_profile(doc, participant)
-    except (OSError, ValueError):
+            return _coerce_profile(doc, name)
+    except Exception:
         pass
-    return {"participant": safe_name(participant), "xp": 0, "badges": [],
+    return {"participant": name, "xp": 0, "badges": [],
             "sessions": 0, "last_session_utc": None, "history": []}
 
 
 def save_profile(participant, data_dir, profile):
-    path = profile_path(participant, data_dir)
+    try:
+        path = profile_path(participant, data_dir)
+    except Exception:
+        return None
+    tmp = path + ".tmp"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(profile, f, indent=2)
         os.replace(tmp, path)
-    except OSError:
-        pass
+    except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        return None
     return path
 
 
 _FALLBACK_STREAKS: dict = {}
 _FALLBACK_HOLD: dict = {}
+_STREAK_LOCK = threading.Lock()
 
 
 def _fallback_hold(k, handle):
@@ -227,6 +262,8 @@ def _fallback_hold(k, handle):
 
 
 def reset_streak(handle):
+    if handle is None:
+        return
     try:
         handle._arcade_streak = 0
         return
@@ -234,13 +271,16 @@ def reset_streak(handle):
         pass
     try:
         k = id(handle)
-        _FALLBACK_STREAKS[k] = 0
-        _fallback_hold(k, handle)
+        with _STREAK_LOCK:
+            _FALLBACK_STREAKS[k] = 0
+            _fallback_hold(k, handle)
     except Exception:
         pass
 
 
 def note_result(handle, ok):
+    if handle is None:
+        return 1 if ok else 0
     try:
         cur = getattr(handle, "_arcade_streak", None)
         if isinstance(cur, int):
@@ -251,17 +291,20 @@ def note_result(handle, ok):
         pass
     try:
         k = id(handle)
-        if ok:
-            _FALLBACK_STREAKS[k] = int(_FALLBACK_STREAKS.get(k, 0)) + 1
-        else:
-            _FALLBACK_STREAKS[k] = 0
-        _fallback_hold(k, handle)
-        return int(_FALLBACK_STREAKS.get(k, 0))
+        with _STREAK_LOCK:
+            if ok:
+                _FALLBACK_STREAKS[k] = int(_FALLBACK_STREAKS.get(k, 0)) + 1
+            else:
+                _FALLBACK_STREAKS[k] = 0
+            _fallback_hold(k, handle)
+            return int(_FALLBACK_STREAKS.get(k, 0))
     except Exception:
         return 1 if ok else 0
 
 
 def streak_of(handle):
+    if handle is None:
+        return 0
     try:
         cur = getattr(handle, "_arcade_streak", None)
         if isinstance(cur, int):
@@ -269,7 +312,8 @@ def streak_of(handle):
     except Exception:
         pass
     try:
-        return int(_FALLBACK_STREAKS.get(id(handle), 0))
+        with _STREAK_LOCK:
+            return int(_FALLBACK_STREAKS.get(id(handle), 0))
     except Exception:
         return 0
 
@@ -286,23 +330,37 @@ def points_for(ok, streak):
 
 def add_session(participant, data_dir, cards, session_id=None, calibrated=False):
     """Persist one session's rewards. Returns (profile, gained, new_badges, leveled_up)."""
-    cards = [c for c in (cards or []) if isinstance(c, dict) and c.get("display")]
+    try:
+        items = list(cards or [])
+    except TypeError:
+        items = []
+    cards = [c for c in items if isinstance(c, dict)
+             and c.get("display") is not None and c.get("value") is not None]
     if not cards:
         raise ValueError("no scored tests; skipping XP")
-    prof = load_profile(participant, data_dir)
+    name = _safe_participant(participant)
+    prof = load_profile(name, data_dir)
+    seen = {h.get("session") for h in (prof.get("history") or [])
+            if isinstance(h, dict)}
+    if session_id is not None and session_id in seen:
+        return prof, 0, [], False
     old_level = level_for_xp(prof.get("xp", 0))
     old_badges = set(prof.get("badges") or [])
     rewards = summarize_rewards(cards, calibrated=calibrated)
     gained = int(rewards["xp"])
-    prof["xp"] = int(prof.get("xp", 0)) + gained
-    prof["sessions"] = int(prof.get("sessions", 0)) + 1
+    prof["xp"] = _safe_xp(prof.get("xp", 0)) + gained
+    prof["sessions"] = _coerce_int(prof.get("sessions", 0)) + 1
     prof["last_session_utc"] = datetime.now(timezone.utc).isoformat()
     new_badges = [b for b in rewards["badges"] if b not in old_badges]
     prof["badges"] = sorted(old_badges | set(rewards["badges"]))
+    try:
+        sid = str(session_id)[:64] if session_id is not None else None
+    except Exception:
+        sid = None
     hist = prof.get("history") or []
-    hist.append({"session": session_id, "xp": gained,
+    hist.append({"session": sid, "xp": gained,
                  "utc": prof["last_session_utc"]})
     prof["history"] = hist[-50:]
-    save_profile(participant, data_dir, prof)
+    save_profile(name, data_dir, prof)
     new_level = level_for_xp(prof["xp"])
     return prof, gained, new_badges, new_level > old_level

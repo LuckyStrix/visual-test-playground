@@ -487,7 +487,7 @@ class ContrastDetection2IFC(Base):
         win.update()
         r, rt = get_key(win, ['1', '2'])
         ok = (r == '1') == first
-        if self.feedback:
+        if self.feedback and main:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'target_first': first}
@@ -520,7 +520,7 @@ class Acuity4AFC(Base):
         win.update()
         r, rt = get_key(win, ['Up', 'Right', 'Down', 'Left'])
         ok = self.map[r] == gap
-        if self.feedback:
+        if self.feedback and main:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'logMAR': round(lvl, 3), 'gap_deg': gap, 'size_px': int(size_px)}
@@ -565,7 +565,7 @@ class ColorDiscrimination2IFC(Base):
         win.update()
         r, rt = get_key(win, ['1', '2'])
         ok = (r == '1') == first_diff
-        if self.feedback:
+        if self.feedback and main:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(delta, 3), 'target_first': first_diff}
@@ -609,7 +609,7 @@ class StaticContrast(Base):
         if main:
             self.stats.note(present, said_yes)
         ok = said_yes == present
-        if self.feedback and not catch:
+        if self.feedback and main and not catch:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'present': present,
@@ -667,7 +667,7 @@ class StaticColorBullseye(Base):
         ok = (said_redder == truth) if truth is not None else False
         if main and not catch and truth is not None:
             self.stats.note(present=bool(truth), said_yes=said_redder)
-        if self.feedback and not catch:
+        if self.feedback and main and not catch:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(delta, 2), 'center': cent_col, 'surround': surr_col,
@@ -720,7 +720,7 @@ class CollinearJudgment(Base):
         if main:
             self.stats.note(not catch, not said_aligned)
         ok = said_aligned == (abs(offset_px) < 0.5)
-        if self.feedback and not catch:
+        if self.feedback and main and not catch:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'offset_px': round(float(offset_px), 2), 'catch': catch,
@@ -776,7 +776,7 @@ class BrightnessMatch(Base):
         if main:
             self.stats.note(not same_trial, not said_same)
         ok = said_same == same_trial
-        if self.feedback and not catch:
+        if self.feedback and main and not catch:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'delta': round(float(delta), 2), 'patch_left': left_p,
@@ -824,7 +824,7 @@ class VernierJudgment(Base):
         win.update()
         r, rt = get_key(win, ['Left', 'Right'])
         ok = (r == 'Right') == (sign > 0)
-        if self.feedback:
+        if self.feedback and main:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'offset_px': round(float(offset_px), 2), 'lower_right': bool(sign > 0),
@@ -1024,6 +1024,7 @@ class SizeMatch:
         self.rng = random.Random(self.seed)
 
     def run_gui(self, canvas, win):
+        _streak_reset(self)
         px, ref = int(round(10.0 * self.ppd)), 2.8 * self.ppd
         biases = []
         try:
@@ -1111,7 +1112,7 @@ class MaskedGabor(Base):
         if main:
             self.stats.note(present, said)
         ok = said == present
-        if self.feedback and not catch:
+        if self.feedback and main and not catch:
             arcade_feedback(self, canvas, win, cx, cy, ok)
             wait_ms(win, 400)
         return ok, rt, {'contrast': round(contrast, 5), 'present': present, 'dur_ms': dur,

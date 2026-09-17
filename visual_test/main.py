@@ -89,6 +89,7 @@ class VisualTestApp:
         self.logger = DataLogger(participant_id='guest')
         self.ppd_var = None
         self.display_profile = DisplayProfile()
+        self._session_running = False
         self.load_profile()
         self.build()
         self.refresh_cal_label()
@@ -525,9 +526,17 @@ class VisualTestApp:
 
     def make_test(self, kind, n, fb, seed=None):
         ppd = self.ppd
+        try:
+            diag = float(self.diag_var.get())
+        except Exception:
+            diag = 24.0
+        try:
+            dist = float(self.dist_var.get())
+        except Exception:
+            dist = 60.0
         self.logger.meta.update(display_ppd=round(ppd, 1),
-                                display_diag_in=float(self.diag_var.get()),
-                                display_dist_cm=float(self.dist_var.get()),
+                                display_diag_in=diag,
+                                display_dist_cm=dist,
                                 screen_px=(self.root.winfo_screenwidth(),
                                            self.root.winfo_screenheight()),
                                 **self.display_profile.as_meta())
@@ -579,6 +588,14 @@ class VisualTestApp:
             from .tests import wait_ms
         except ImportError:
             from tests import wait_ms  # type: ignore[no-redef]
+        try:
+            total = max(1, int(total))
+        except (TypeError, ValueError, OverflowError):
+            total = 1
+        try:
+            i = max(0, min(int(i), total - 1))
+        except (TypeError, ValueError, OverflowError):
+            i = 0
         icon, title, tag = A.mission_meta(kind)
         if feedback:
             try:
@@ -593,19 +610,48 @@ class VisualTestApp:
                            font=('Arial', 26, 'bold'), fill='white')
         canvas.create_text(w // 2, 250, text=f'{title} — {tag}',
                            font=('Arial', 16), fill='gold')
+        canvas.create_text(w // 2, 275, text='(any key skips)',
+                           font=('Arial', 11), fill='#999')
         canvas.create_rectangle(x0, 300, x0 + bar_w, 322, outline='white')
-        fill = int(bar_w * i / max(1, total))
+        fill = int(bar_w * i / total)
         if fill:
             canvas.create_rectangle(x0, 300, x0 + fill, 322, fill='#2e7d32', outline='')
         win.update()
-        for n in ('3', '2', '1', 'GO!'):
-            canvas.delete('count')
-            canvas.create_text(w // 2, 380, text=n, font=('Arial', 40, 'bold'),
-                               fill='yellow', tags='count')
-            win.update()
-            wait_ms(win, 350 if n != 'GO!' else 500)
+        skip, gone = [], []
+
+        def _brief_key(e):
+            skip.append(1)
+
+        win.bind('<KeyPress>', _brief_key)
+        win.focus_force()
+        try:
+            for n in ('3', '2', '1', 'GO!'):
+                if skip:
+                    break
+                canvas.delete('count')
+                canvas.create_text(w // 2, 380, text=n, font=('Arial', 40, 'bold'),
+                                   fill='yellow', tags='count')
+                win.update()
+                try:
+                    wait_ms(win, 350 if n != 'GO!' else 500)
+                except RuntimeError:
+                    gone.append(1)
+                    break
+                if skip:
+                    break
+        finally:
+            try:
+                if win.winfo_exists():
+                    win.unbind('<KeyPress>')
+            except Exception:
+                pass
+        if gone:
+            raise RuntimeError("Stimulus window closed")
 
     def start_session(self):
+        if self._session_running:
+            self.log('A session is already running — finish it first.')
+            return
         want = (self.name_var.get() or '').strip()
         if want and want != self.logger.participant_id:
             self.switch_profile()
@@ -617,7 +663,17 @@ class VisualTestApp:
             except Exception:
                 pass
             return
-        n, fb = self.n_var.get(), self.fb_var.get()
+        try:
+            n = int(self.n_var.get())
+        except Exception:
+            self.log('Bad trial count; using 40.')
+            n = 40
+        n = max(1, min(200, n))
+        try:
+            fb = bool(self.fb_var.get())
+        except Exception:
+            fb = True
+        self._session_running = True
         seed_base = self.session_seed()
         for kind in kinds:
             if kind not in FIXED_TRIAL_KINDS:
@@ -682,6 +738,10 @@ class VisualTestApp:
             except Exception:
                 pass
         finally:
+            try:
+                self._session_running = False
+            except Exception:
+                pass
             try:
                 self.logger.save()
                 self.log(f'Saved to {self.logger.csv_path}')
