@@ -148,6 +148,14 @@ class VisualTestApp:
         self.name_var = tk.StringVar(value=self.logger.participant_id)
         tk.Entry(pf, textvariable=self.name_var, width=22).pack(side='left', padx=6)
         tk.Button(pf, text='Use profile', command=self.switch_profile).pack(side='left')
+        
+        # Difficulty selection
+        tk.Label(pf, text='Difficulty:', font=('Arial', 11, 'bold')).pack(side='left', padx=(10, 0))
+        self.difficulty_var = tk.StringVar(value='normal')
+        difficulties = [('Easy', 'easy'), ('Normal', 'normal'), ('Hard', 'hard'), ('Extreme', 'extreme')]
+        for text, value in difficulties:
+            tk.Radiobutton(pf, text=text, variable=self.difficulty_var, value=value).pack(side='left', padx=2)
+        
         self.profile_lbl = tk.StringVar(value=f"Saving to: {self.logger.csv_path}")
         tk.Label(self.root, textvariable=self.profile_lbl, fg='#555').pack()
         try:
@@ -524,6 +532,20 @@ class VisualTestApp:
                 pass
             return None
 
+    def get_difficulty_adjustment(self):
+        """Get adjustment for test difficulty based on user selection - modifies start_val"""
+        difficulty = self.difficulty_var.get()
+        if difficulty == 'easy':
+            return -1.0  # Easier: start with stronger stimulus (higher start_val)
+        elif difficulty == 'normal':
+            return 0.0   # Normal: no adjustment
+        elif difficulty == 'hard':
+            return 1.0   # Harder: start with weaker stimulus (lower start_val)
+        elif difficulty == 'extreme':
+            return 2.0   # Extreme: start with much weaker stimulus
+        else:
+            return 0.0   # Default to normal
+
     def make_test(self, kind, n, fb, seed=None):
         ppd = self.ppd
         try:
@@ -540,37 +562,55 @@ class VisualTestApp:
                                 screen_px=(self.root.winfo_screenwidth(),
                                            self.root.winfo_screenheight()),
                                 **self.display_profile.as_meta())
+        
         base = dict(n_trials=n, feedback=fb, practice_trials=3, seed=seed)
         sp = STAIR_DEFAULTS.get(kind)
+        if sp:
+            # Create a copy to avoid modifying the original
+            adjusted_sp = sp.copy()
+            # Apply difficulty adjustment to start_val
+            difficulty_adj = self.get_difficulty_adjustment()
+            original_start = adjusted_sp['start_val']
+            new_start = original_start - difficulty_adj  # Subtract because: easier = higher start_val
+            
+            # Clamp to reasonable bounds (but respect the original min/max)
+            min_bound = adjusted_sp.get('min_val', -10.0)
+            max_bound = adjusted_sp.get('max_val', 10.0)
+            new_start = max(min_bound, min(max_bound, new_start))
+            
+            adjusted_sp['start_val'] = new_start
+        else:
+            adjusted_sp = sp
+            
         if kind == 'collinear':
-            return CollinearJudgment('Collinearity Y/N', self.logger, ppd, dict(sp), **base)
+            return CollinearJudgment('Collinearity Y/N', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'brightness':
-            return BrightnessMatch('Brightness same/diff', self.logger, ppd, dict(sp), **base)
+            return BrightnessMatch('Brightness same/diff', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'vernier':
-            return VernierJudgment('Vernier L/R', self.logger, ppd, dict(sp), **base)
+            return VernierJudgment('Vernier L/R', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'subitize':
             return Subitizing('Subitizing 1-9', self.logger, n_trials=n, feedback=fb,
-                              ppd=ppd, seed=seed)
+                               ppd=ppd, seed=seed)
         if kind == 'hueorder':
             return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd, seed=seed,
                                feedback=fb)
         if kind == 'sizematch':
             return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd, seed=seed,
-                             feedback=fb)
+                            feedback=fb)
         if kind == 'masked':
-            return MaskedGabor('Masked Gabor Y/N', self.logger, ppd, dict(sp), **base)
+            return MaskedGabor('Masked Gabor Y/N', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'static_contrast':
-            return StaticContrast('Static Contrast Y/N', self.logger, ppd, dict(sp), **base)
+            return StaticContrast('Static Contrast Y/N', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'static_color':
-            return StaticColorBullseye('Static Bullseye R/B', self.logger, ppd, dict(sp), **base)
+            return StaticColorBullseye('Static Bullseye R/B', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'static_rt':
             return StaticReactionTime('Static Reaction Time', self.logger, n_trials=n,
-                                      ppd=ppd, seed=seed, feedback=fb)
+                                       ppd=ppd, seed=seed, feedback=fb)
         if kind == 'contrast':
-            return ContrastDetection2IFC('Contrast 2IFC', self.logger, ppd, dict(sp), **base)
+            return ContrastDetection2IFC('Contrast 2IFC', self.logger, ppd, dict(adjusted_sp), **base)
         if kind == 'acuity':
-            return Acuity4AFC('Acuity 4AFC', self.logger, ppd, dict(sp), **base)
-        return ColorDiscrimination2IFC('Colour 2IFC', self.logger, ppd, dict(sp), **base)
+            return Acuity4AFC('Acuity 4AFC', self.logger, ppd, dict(adjusted_sp), **base)
+        return ColorDiscrimination2IFC('Colour 2IFC', self.logger, ppd, dict(adjusted_sp), **base)
 
     def selected_kinds(self):
         return [v for _, v in TEST_ORDER if self.test_vars[v].get()]
