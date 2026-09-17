@@ -27,7 +27,10 @@ catches (hit/FA/d′ in the JSON summary).
 - collinear / brightness / vernier — hyperacuity/illusion staircases
 - static_rt / subitize / hueorder / sizematch — fixed-trial probes
 
-Esc quits, responses time out after 60 s. Pressing Esc on the final
+Tick checkboxes to pick which tests run in one session ("Select all" /
+"Clear" helpers, "START SESSION" runs them in listed order into a single
+CSV + JSON). Esc quits the current test and skips the rest of the
+session; responses time out after 60 s. Pressing Esc on the final
 "done" screen dismisses it without aborting the test.
 
 Every test takes an optional `seed=`; the chosen seed is stored in the

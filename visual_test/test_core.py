@@ -1,6 +1,7 @@
 """Headless verification for test classes (no display needed)."""
 import pytest
 
+from . import main as M
 from . import tests as T
 from .datalogger import DataLogger
 
@@ -295,6 +296,14 @@ def test_gamma_starts_vary_per_reference(monkeypatch):
     Wmod.stage_gamma(DummyCanvas(), DummyWin(), DisplayProfile())
     assert starts == [min(max(int(round(r)), 1), 254) for r in HALFTONE_LEVELS]
     assert len(set(starts)) == 3
+
+
+def test_session_registry_consistent():
+    kinds = [v for _, v in M.TEST_ORDER]
+    assert len(kinds) == len(set(kinds))
+    assert set(kinds) == set(M.INSTR)
+    for k in kinds:
+        assert k in M.STAIR_DEFAULTS or k in M.FIXED_TRIAL_KINDS
 
 
 def test_json_written_per_trial(tmp_path, monkeypatch):

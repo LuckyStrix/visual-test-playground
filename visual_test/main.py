@@ -39,8 +39,40 @@ STAIR_DEFAULTS = {
     'acuity': dict(start_val=0.3, step_sizes=[0.2, 0.1, 0.05],
                    n_reversals=8, min_val=-0.2, max_val=1.0, rule='3D1U'),
     'color': dict(start_val=1.3, step_sizes=[0.3, 0.2, 0.1],
-                  n_reversals=8, min_val=0.3, max_val=2.0, rule='3D1U'),
+                   n_reversals=8, min_val=0.3, max_val=2.0, rule='3D1U'),
 }
+
+FIXED_TRIAL_KINDS = ('subitize', 'hueorder', 'sizematch', 'static_rt')
+
+TEST_ORDER = [
+    ('STATIC contrast: stripes there or not? (Y/N)', 'static_contrast'),
+    ('STATIC colour bullseye: center redder or bluer? (R/B)', 'static_color'),
+    ('STATIC reaction time: press SPACE when disc pops (no memory)', 'static_rt'),
+    ('2 Collinearity: are the two segments aligned? (Y/N)', 'collinear'),
+    ('3 Brightness match: same grey on dark vs light ring?', 'brightness'),
+    ('6 Vernier: lower bar left or right? (Left/Right)', 'vernier'),
+    ('15 How many dots? (1-9 keys)', 'subitize'),
+    ('19 Order 6 hues light->dark (click in order)', 'hueorder'),
+    ('26 Size match: adjust disc, Enter when equal (bias)', 'sizematch'),
+    ('43 Masked Gabor: stripes there? (Y/N, brief+mask)', 'masked'),
+    ('Contrast detection (2IFC Gabor, 3D1U)', 'contrast'),
+    ('Acuity (4AFC Landolt C, 3D1U)', 'acuity'),
+    ('Colour (2IFC isoluminant, 3D1U)', 'color')]
+
+INSTR = {
+    'static_contrast': 'STATIC: stripes on screen now?\nKeys: Y = yes, N = no',
+    'static_color': 'STATIC: is the CENTER redder or bluer than the ring?\nKeys: R = redder, B = bluer',
+    'static_rt': 'STATIC: wait, then press SPACE the instant the disc pops up.\nNo memory, just react.',
+    'collinear': 'STATIC: are the two white bars ALIGNED?\nKeys: Y = aligned, N = offset',
+    'brightness': 'STATIC: are the two grey patches the SAME grey?\nKeys: Y = same, N = different',
+    'vernier': 'STATIC: is the LOWER bar LEFT or RIGHT of the upper?\nKeys: Left / Right arrows',
+    'subitize': 'STATIC: how many dots? Press 1-9.',
+    'hueorder': 'STATIC: click the 6 colour chips LIGHTEST to DARKEST.',
+    'sizematch': 'STATIC: Up/Down resizes right disc, Enter when it equals left.',
+    'masked': 'STATIC: brief flash then noise — stripes there?\nKeys: Y = yes, N = no',
+    'contrast': 'Which interval had the striped patch?\nKeys: 1 = first, 2 = second',
+    'acuity': 'Which way does the C gap point?\nKeys: Up / Right / Down / Left arrows',
+    'color': 'Which interval had the DIFFERENT colours?\nKeys: 1 = first, 2 = second'}
 
 
 class VisualTestApp:
@@ -128,22 +160,11 @@ class VisualTestApp:
             return 43.0
 
     def build_tests(self, f):
-        self.test_var = tk.StringVar(value='static_contrast')
-        for i, (t, v) in enumerate([
-                ('STATIC contrast: stripes there or not? (Y/N)', 'static_contrast'),
-                ('STATIC colour bullseye: center redder or bluer? (R/B)', 'static_color'),
-                ('STATIC reaction time: press SPACE when disc pops (no memory)', 'static_rt'),
-                ('2 Collinearity: are the two segments aligned? (Y/N)', 'collinear'),
-                ('3 Brightness match: same grey on dark vs light ring?', 'brightness'),
-                ('6 Vernier: lower bar left or right? (Left/Right)', 'vernier'),
-                ('15 How many dots? (1-9 keys)', 'subitize'),
-                ('19 Order 6 hues light->dark (click in order)', 'hueorder'),
-                ('26 Size match: adjust disc, Enter when equal (bias)', 'sizematch'),
-                ('43 Masked Gabor: stripes there? (Y/N, brief+mask)', 'masked'),
-                ('Contrast detection (2IFC Gabor, 3D1U)', 'contrast'),
-                ('Acuity (4AFC Landolt C, 3D1U)', 'acuity'),
-                ('Colour (2IFC isoluminant, 3D1U)', 'color')]):
-            tk.Radiobutton(f, text=t, variable=self.test_var, value=v).grid(row=i + 1, column=0, sticky='w')
+        self.test_vars = {}
+        for i, (t, v) in enumerate(TEST_ORDER):
+            var = tk.BooleanVar(value=(v == 'static_contrast'))
+            self.test_vars[v] = var
+            tk.Checkbutton(f, text=t, variable=var).grid(row=i + 1, column=0, sticky='w')
         tk.Label(f, text='Trials (max):').grid(row=0, column=1, sticky='e')
         self.n_var = tk.IntVar(value=40)
         tk.Spinbox(f, from_=20, to=80, textvariable=self.n_var, width=5).grid(row=1, column=1)
@@ -151,8 +172,12 @@ class VisualTestApp:
         tk.Checkbutton(f, text='Feedback', variable=self.fb_var).grid(row=2, column=1, sticky='w')
         self.fs_var = tk.BooleanVar(value=True)
         tk.Checkbutton(f, text='Fullscreen stimulus', variable=self.fs_var).grid(row=3, column=1, sticky='w')
-        tk.Button(self.root, text='START TEST', font=('Arial', 12, 'bold'),
-                  bg='#2e7d32', fg='white', command=self.start_test).pack(pady=8)
+        btns = tk.Frame(self.root)
+        btns.pack(pady=8)
+        tk.Button(btns, text='Select all', command=self.select_all).pack(side='left', padx=4)
+        tk.Button(btns, text='Clear', command=self.select_none).pack(side='left', padx=4)
+        tk.Button(btns, text='START SESSION', font=('Arial', 12, 'bold'),
+                  bg='#2e7d32', fg='white', command=self.start_session).pack(side='left', padx=8)
         self.status = tk.StringVar(value='Ready')
         tk.Label(self.root, textvariable=self.status, relief='sunken', anchor='w').pack(side='bottom', fill='x')
         self.logbox = tk.Text(self.root, height=10, state='disabled')
@@ -332,17 +357,35 @@ class VisualTestApp:
             return Acuity4AFC('Acuity 4AFC', self.logger, ppd, dict(sp), **base)
         return ColorDiscrimination2IFC('Colour 2IFC', self.logger, ppd, dict(sp), **base)
 
-    def start_test(self):
+    def selected_kinds(self):
+        return [v for _, v in TEST_ORDER if self.test_vars[v].get()]
+
+    def select_all(self):
+        for var in self.test_vars.values():
+            var.set(True)
+
+    def select_none(self):
+        for var in self.test_vars.values():
+            var.set(False)
+
+    def start_session(self):
         want = (self.name_var.get() or '').strip()
         if want and want != self.logger.participant_id:
             self.switch_profile()
-        kind, n, fb = self.test_var.get(), self.n_var.get(), self.fb_var.get()
-        if kind not in ('subitize', 'hueorder', 'sizematch', 'static_rt'):
-            need = STAIR_DEFAULTS[kind]['n_reversals']
-            if n < need * 3:
-                self.log(f'Warning: {n} trials is thin for {need} reversals; suggest >= {need * 3}')
-        test = self.make_test(kind, n, fb)
-        self.log(f'Starting {test.name}')
+        kinds = self.selected_kinds()
+        if not kinds:
+            self.log('No tests selected — tick at least one checkbox.')
+            try:
+                messagebox.showwarning('No tests selected', 'Tick at least one test first.')
+            except Exception:
+                pass
+            return
+        n, fb = self.n_var.get(), self.fb_var.get()
+        for kind in kinds:
+            if kind not in FIXED_TRIAL_KINDS:
+                need = STAIR_DEFAULTS[kind]['n_reversals']
+                if n < need * 3:
+                    self.log(f'Warning: {n} trials is thin for {need} reversals; suggest >= {need * 3}')
         win = tk.Toplevel(self.root)
         win.title('Stimulus - press keys as instructed (Esc quits)')
         win.geometry('800x600')
@@ -354,31 +397,34 @@ class VisualTestApp:
         canvas = tk.Canvas(win, width=800, height=600, bg='gray', highlightthickness=0)
         canvas.pack(fill='both', expand=True)
         win.update()
+        done_kinds = []
         try:
-            instr = {'static_contrast': 'STATIC: stripes on screen now?\nKeys: Y = yes, N = no',
-                     'static_color': 'STATIC: is the CENTER redder or bluer than the ring?\nKeys: R = redder, B = bluer',
-                     'static_rt': 'STATIC: wait, then press SPACE the instant the disc pops up.\nNo memory, just react.',
-                     'collinear': 'STATIC: are the two white bars ALIGNED?\nKeys: Y = aligned, N = offset',
-                     'brightness': 'STATIC: are the two grey patches the SAME grey?\nKeys: Y = same, N = different',
-                     'vernier': 'STATIC: is the LOWER bar LEFT or RIGHT of the upper?\nKeys: Left / Right arrows',
-                     'subitize': 'STATIC: how many dots? Press 1-9.',
-                     'hueorder': 'STATIC: click the 6 colour chips LIGHTEST to DARKEST.',
-                     'sizematch': 'STATIC: Up/Down resizes right disc, Enter when it equals left.',
-                     'masked': 'STATIC: brief flash then noise — stripes there?\nKeys: Y = yes, N = no',
-                     'contrast': 'Which interval had the striped patch?\nKeys: 1 = first, 2 = second',
-                     'acuity': 'Which way does the C gap point?\nKeys: Up / Right / Down / Left arrows',
-                     'color': 'Which interval had the DIFFERENT colours?\nKeys: 1 = first, 2 = second'}[kind]
-            instr += '\n\n3 easy practice trials first.\nPress any key to begin (Esc cancels).'
-            canvas.delete('all')
-            canvas.create_text(400, 300, text=instr, font=('Arial', 16), justify='center')
-            win.update()
-            self.wait_key(win)
-            canvas.delete('all')
-            win.update()
-            out = test.run_gui(canvas, win)
-            self.log_results(kind, test, out)
-        except QuitExperiment as e:
-            self.log(f'Aborted by participant: {e}')
+            for i, kind in enumerate(kinds):
+                test = self.make_test(kind, n, fb)
+                self.log(f'Starting {test.name} ({i + 1}/{len(kinds)})')
+                instr = INSTR[kind]
+                instr += f'\n\nTest {i + 1} of {len(kinds)}.'
+                if kind not in FIXED_TRIAL_KINDS:
+                    instr += '\n3 easy practice trials first.'
+                instr += '\nPress any key to begin (Esc skips the rest).'
+                canvas.delete('all')
+                canvas.create_text(400, 300, text=instr, font=('Arial', 16), justify='center')
+                win.update()
+                try:
+                    self.wait_key(win)
+                except QuitExperiment:
+                    self.log(f'Session stopped before {test.name}; {len(done_kinds)} done.')
+                    break
+                canvas.delete('all')
+                win.update()
+                try:
+                    out = test.run_gui(canvas, win)
+                except QuitExperiment as e:
+                    self.log(f'Aborted by participant during {test.name}: {e}')
+                    break
+                self.log_results(kind, test, out)
+                done_kinds.append(kind)
+            self.log(f'Session done: {len(done_kinds)}/{len(kinds)} tests completed.')
         except (TimeoutError, RuntimeError) as e:
             self.log(f'Stopped: {e}')
             try:
