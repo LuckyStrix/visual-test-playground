@@ -144,13 +144,18 @@ class VisualTestApp:
                  font=('Arial', 10)).pack(side='left', padx=8)
         pf = tk.Frame(self.root)
         pf.pack(fill='x', padx=16, pady=4)
-        tk.Label(pf, text='Player:', font=('Arial', 11, 'bold')).pack(side='left')
-        self.name_var = tk.StringVar(value=self.logger.participant_id)
-        tk.Entry(pf, textvariable=self.name_var, width=22).pack(side='left', padx=6)
-        tk.Button(pf, text='Use profile', command=self.switch_profile).pack(side='left')
 
-        # Difficulty selection
-        tk.Label(pf, text='Difficulty:', font=('Arial', 11, 'bold')).pack(side='left', padx=(10, 0))
+        # Player info frame
+        player_info = tk.Frame(pf)
+        player_info.pack(fill='x')
+        tk.Label(player_info, text='Player:', font=('Arial', 11, 'bold')).pack(side='left')
+        tk.Entry(player_info, textvariable=self.name_var, width=22).pack(side='left', padx=6)
+        tk.Button(player_info, text='Use profile', command=self.switch_profile).pack(side='left')
+
+        # Difficulty frame
+        difficulty_frame = tk.Frame(pf)
+        difficulty_frame.pack(fill='x', pady=(4,0))
+        tk.Label(difficulty_frame, text='Difficulty:', font=('Arial', 11, 'bold')).pack(side='left', padx=(0, 10))
         self.difficulty_var = tk.StringVar(value='normal')
         difficulties = [
                 ('Easy', 'easy'),
@@ -159,7 +164,7 @@ class VisualTestApp:
                 ('Extreme', 'extreme'),
             ]
         for text, value in difficulties:
-            rb = tk.Radiobutton(pf, text=text, variable=self.difficulty_var, value=value)
+            rb = tk.Radiobutton(difficulty_frame, text=text, variable=self.difficulty_var, value=value)
             rb.pack(side='left', padx=2)
 
         self.profile_lbl = tk.StringVar(value=f"Saving to: {self.logger.csv_path}")
