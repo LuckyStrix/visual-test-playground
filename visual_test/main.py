@@ -85,7 +85,8 @@ class VisualTestApp:
     def __init__(self, root):
         self.root = root
         self.root.title('Visual Test (EXPERIMENTAL - not for real use)')
-        self.root.geometry('700x900')
+        self.root.geometry('1000x1200')
+        self.root.resizable(True, True)
         self.logger = DataLogger(participant_id='guest')
         self.ppd_var = None
         self.display_profile = DisplayProfile()
