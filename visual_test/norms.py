@@ -16,17 +16,14 @@ import numpy as np
 
 MIN_N_FOR_PERCENTILE = 5
 
-HIGHER_BETTER = frozenset({"subitize"})
+HIGHER_BETTER: frozenset = frozenset()
 
 GUI_LABEL_TO_KIND = {
     "STATIC contrast: stripes there or not? (Y/N)": "static_contrast",
     "STATIC colour bullseye: center redder or bluer? (R/B)": "static_color",
     "STATIC reaction time: press SPACE when disc pops (no memory)": "static_rt",
-    "Collinearity: are the two segments aligned? (Y/N)": "collinear",
     "Brightness match: same grey on dark vs light ring?": "brightness",
     "Vernier: lower bar left or right? (Left/Right)": "vernier",
-    "How many dots? (1-9 keys)": "subitize",
-    "Order 6 hues light->dark (click in order)": "hueorder",
     "Size match: adjust disc, Enter when equal (bias)": "sizematch",
     "Masked Gabor: stripes there? (Y/N, brief+mask)": "masked",
     "Contrast detection (2IFC Gabor, 3D1U)": "contrast",
@@ -41,11 +38,8 @@ NAME_TO_KIND = {
     "Static Contrast Y/N": "static_contrast",
     "Static Bullseye R/B": "static_color",
     "Static Reaction Time": "static_rt",
-    "Collinearity Y/N": "collinear",
     "Brightness same/diff": "brightness",
     "Vernier L/R": "vernier",
-    "Subitizing 1-9": "subitize",
-    "Hue ordering": "hueorder",
     "Size match bias": "sizematch",
     "Masked Gabor Y/N": "masked",
 }
@@ -102,7 +96,7 @@ def extract(kind, summary):
             return None
         delta = 10.0**thr
         return {"value": delta, "display": f"{delta:.1f} device steps", "higher_better": higher}
-    if kind in ("collinear", "vernier"):
+    if kind == "vernier":
         thr = _num(s.get("threshold_log"))
         if thr is None or not -4.0 <= thr <= 1.0:
             return None
@@ -119,24 +113,6 @@ def extract(kind, summary):
         if med is None or not 0.05 <= med <= 5.0:
             return None
         return {"value": med * 1000.0, "display": f"{med * 1000.0:.0f} ms", "higher_better": higher}
-    if kind == "subitize":
-        acc = _num(s.get("accuracy"))
-        if acc is None or not 0.0 <= acc <= 1.0:
-            return None
-        return {
-            "value": acc * 100.0,
-            "display": f"{acc * 100.0:.0f}% correct",
-            "higher_better": higher,
-        }
-    if kind == "hueorder":
-        disp = _num(s.get("mean_displacement"))
-        if disp is None or not 0.0 <= disp <= 5.0:
-            return None
-        return {
-            "value": disp,
-            "display": f"{disp:.2f} mean displacement (0 = perfect)",
-            "higher_better": higher,
-        }
     if kind == "sizematch":
         bias = _num(s.get("mean_bias"))
         if bias is None or not -2.0 <= bias <= 2.0:

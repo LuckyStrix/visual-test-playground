@@ -104,12 +104,10 @@ STAIR_SUITE = [
                                          staircase_params=sp(1.3, 0.3, 2.0)), ['1', '2'], None),
     _row(T.StaticContrast, dict(name='SC', ppd=43.0,
                                 staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.1),
-    _row(T.StaticColorBullseye, dict(name='SB', ppd=43.0,
-                                     staircase_params=sp(1.5, 0.5, 2.0)), ['r', 'b'], 0.9),
-    _row(T.CollinearJudgment, dict(name='CJ', ppd=43.0,
-                                   staircase_params=sp(-1.0, -3.0, 0.0)), ['y', 'n'], 0.3),
+_row(T.StaticColorBullseye, dict(name='SB', ppd=43.0,
+                                      staircase_params=sp(1.5, 0.5, 2.0)), ['r', 'b'], 0.9),
     _row(T.BrightnessMatch, dict(name='BM', ppd=43.0,
-                                 staircase_params=sp(1.0, 0.0, 1.8)), ['y', 'n'], 0.7),
+                                  staircase_params=sp(1.0, 0.0, 1.8)), ['y', 'n'], 0.7),
     _row(T.VernierJudgment, dict(name='V', ppd=43.0,
                                  staircase_params=sp(-1.3, -2.5, 0.0)), ['Left', 'Right'], None),
     _row(T.MaskedGabor, dict(name='M', ppd=43.0,
@@ -160,13 +158,7 @@ def test_catch_trials_excluded_from_staircase(tmp_path, monkeypatch):
     assert all(r['correct'] == '' for r in catches)
 
 
-def test_subitizing_balanced(tmp_path, monkeypatch):
-    lg = DataLogger('TEST', data_dir=str(tmp_path))
-    sub = T.Subitizing('S', lg, n_trials=18)
-    monkeypatch.setattr(T, 'get_key', lambda w, valid, **k: ('3', 0.2))
-    sub.run_gui(DummyCanvas(), DummyWin())
-    counts = [r['n_dots'] for r in lg.trials]
-    assert sorted(counts) == sorted((list(range(1, 10)) * 2))
+
 
 
 def test_sizematch(tmp_path, monkeypatch):
@@ -177,19 +169,6 @@ def test_sizematch(tmp_path, monkeypatch):
                         lambda w, valid, **k: (keys.pop(0) if keys else valid[0], 0.1))
     bias, biases = sm.run_gui(DummyCanvas(), DummyWin())
     assert len(biases) == 2
-
-
-def test_same_seed_reproduces_trial_sequence(tmp_path, monkeypatch):
-    def run(seed):
-        lg = DataLogger('TEST', data_dir=str(tmp_path))
-        t = T.CollinearJudgment('CJ', lg, ppd=43.0,
-                                staircase_params=sp(-1.0, -3.0, 0.0),
-                                n_trials=6, practice_trials=0, seed=seed)
-        monkeypatch.setattr(T, 'get_key', lambda w, valid, **k: ('y', 0.25))
-        t.run_gui(DummyCanvas(), DummyWin())
-        return [(r['offset_px'], r.get('catch')) for r in lg.trials]
-    assert run(42) == run(42)
-    assert run(42) != run(43)
 
 
 def test_anticipatory_rt_retries_and_flags(tmp_path, monkeypatch):
@@ -242,14 +221,16 @@ def test_bullseye_reports_bias(tmp_path, monkeypatch):
 
 def test_abort_records_partial_summary(tmp_path, monkeypatch):
     lg = DataLogger('TEST', data_dir=str(tmp_path))
-    t = drive_seed(T.Subitizing('S', lg, n_trials=6, seed=9))
+    t = drive_seed(T.StaticColorBullseye('SB', lg, ppd=43.0,
+                                          staircase_params=sp(1.5, 0.5, 2.0),
+                                          n_trials=6, practice_trials=0, seed=9))
     calls = {'n': 0}
 
     def flaky(w, valid, **k):
         calls['n'] += 1
         if calls['n'] > 2:
             raise T.QuitExperiment("Participant pressed Escape")
-        return ('3', 0.2)
+        return ('r', 0.2)
     monkeypatch.setattr(T, 'get_key', flaky)
     import pytest as _pt
     with _pt.raises(T.QuitExperiment):

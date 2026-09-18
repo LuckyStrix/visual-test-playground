@@ -40,16 +40,6 @@ TEST_INFO = {
         "good": "Median ~200-300 ms with few false starts for most adults.",
         "checks": "Many false starts means anticipating instead of reacting.",
     },
-    "collinear": {
-        "title": "Collinearity judgment",
-        "what": (
-            "Two bar segments; you judged aligned vs offset. Threshold = "
-            "smallest offset reliably spotted."
-        ),
-        "unit": "smaller arcmin = finer alignment sense",
-        "good": "Low threshold with aligned trials correctly called aligned.",
-        "checks": "Calling everything aligned inflates the threshold silently.",
-    },
     "brightness": {
         "title": "Brightness match (simultaneous contrast)",
         "what": (
@@ -71,20 +61,6 @@ TEST_INFO = {
         "unit": "smaller arcmin = finer position sense",
         "good": "Tens of arcseconds is typical for healthy vision.",
         "checks": "Clipped levels mean offsets hit the 1-pixel display floor.",
-    },
-    "subitize": {
-        "title": "Subitizing (how many dots)",
-        "what": "Brief dot clouds of 1-9 dots; you pressed the count.",
-        "unit": "higher % = better rapid enumeration",
-        "good": "Near-perfect up to 4 dots; errors climb past the subitizing range.",
-        "checks": "Low accuracy past 5 dots is normal, not a failure.",
-    },
-    "hueorder": {
-        "title": "Hue ordering",
-        "what": "Six colour chips clicked lightest to darkest.",
-        "unit": "0 = perfect order; larger = more misordered",
-        "good": "Mean displacement near 0.",
-        "checks": "Repeated swaps of the same pair hint at a genuine confusion.",
     },
     "sizematch": {
         "title": "Size match bias",

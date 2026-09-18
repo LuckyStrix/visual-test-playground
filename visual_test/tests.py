@@ -1,7 +1,7 @@
 """Static single-display tests: one scene on screen, judge what you see now.
 
 Forced-choice tasks (2IFC/4AFC) feed every trial to the staircase.
-Yes/no detection tasks (StaticContrast, MaskedGabor, CollinearJudgment,
+Yes/no detection tasks (StaticContrast, MaskedGabor,
 BrightnessMatch) feed signal trials only; no-signal trials are logged as
 catches and summarised as hit rate / false-alarm rate / d' so criterion
 bias is flagged instead of silently becoming a "threshold".
@@ -20,14 +20,14 @@ try:
     from .staircase import Staircase
     from .stimuli import (gabor_patch, blank_patch, landolt_c, solid_patch, bullseye,
                           red_blue_pair, bright_disc, acuity_size_px, isoluminant_pair,
-                          collinear_segments, brightness_pair, vernier_bars, dot_cloud,
-                          hue_chips, size_pair, noise_mask, BG)
+                          brightness_pair, vernier_bars,
+                          size_pair, noise_mask, BG)
 except ImportError:
     from staircase import Staircase
     from stimuli import (gabor_patch, blank_patch, landolt_c, solid_patch, bullseye,
                          red_blue_pair, bright_disc, acuity_size_px, isoluminant_pair,
-                         collinear_segments, brightness_pair, vernier_bars, dot_cloud,
-                         hue_chips, size_pair, noise_mask, BG)
+                         brightness_pair, vernier_bars,
+                         size_pair, noise_mask, BG)
 
 
 class QuitExperiment(Exception):
@@ -699,64 +699,6 @@ class StaticColorBullseye(Base):
         return out
 
 
-class CollinearJudgment(Base):
-    """Two static bars — aligned (Y) or offset (N)?
-
-    Aligned trials are catches (excluded from the staircase) that estimate
-    the false-alarm rate; the staircase tracks offset trials only."""
-    kind = 'collinear'
-
-    def __init__(self, name, logger, ppd, staircase_params, n_trials=40,
-                 feedback=True, practice_trials=3,
-                 seed=None):
-        super().__init__(name, logger, staircase_params, n_trials, feedback, practice_trials,
-                         seed=seed)
-        self.ppd = ppd
-        self.px = int(round(4.0 * ppd))
-        self.stats = YesNoStats()
-
-    def trial(self, canvas, win, lvl, main):
-        if main and self.np_rng.random() < 0.2:
-            offset_px, catch = 0.0, True
-        else:
-            raw_px = 10 ** lvl * self.ppd
-            if not main:
-                raw_px = max(raw_px, 0.15 * self.ppd)
-            if abs(raw_px) < 1.0:
-                self._clipped_levels = getattr(self, '_clipped_levels', [])
-                self._clipped_levels.append(round(float(lvl), 3))
-                raw_px = 1.0 if raw_px >= 0 else -1.0
-            offset_px = raw_px
-            catch = False
-            if self.np_rng.random() < 0.5:
-                offset_px = -offset_px
-        cx, cy = center(canvas)
-        canvas.delete('all')
-        fixation(canvas, cx, cy)
-        show_img(canvas, cx, cy, collinear_segments(self.px, offset_px))
-        canvas.create_text(cx, cy + self.px * 0.62, text='Y = aligned   N = offset', fill='white')
-        win.update()
-        r, rt = get_key(win, ['y', 'Y', 'n', 'N'])
-        said_aligned = r.lower() == 'y'
-        if main:
-            self.stats.note(not catch, not said_aligned)
-        ok = said_aligned == (abs(offset_px) < 0.5)
-        if self.feedback and main and not catch:
-            arcade_feedback(self, canvas, win, cx, cy, ok)
-            wait_ms(win, 400)
-        return ok, rt, {'offset_px': round(float(offset_px), 2), 'catch': catch,
-                        'said_aligned': said_aligned}
-
-    def run_gui(self, canvas, win):
-        try:
-            out = super().run_gui(canvas, win)
-        except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt):
-            attach_yesno_summary(self.logger, self.stats)
-            raise
-        attach_yesno_summary(self.logger, self.stats)
-        return out
-
-
 class BrightnessMatch(Base):
     """Identical grey patches on dark vs light rings — same (Y) or different (N)?
 
@@ -852,183 +794,6 @@ class VernierJudgment(Base):
                         'offset_clipped': bool(main and clipped)}
 
 
-class Subitizing:
-    """Static dot cloud, press 1-9 for how many. Accuracy + RT per numerosity."""
-    kind = 'subitize'
-
-    def __init__(self, name, logger, n_trials=36, feedback=True, ppd=43.0, seed=None):
-        self.name = name
-        self.logger = logger
-        self.n_trials = max(1, int(n_trials))
-        self.feedback = feedback
-        self.ppd = ppd
-        self.seed = random.randrange(2 ** 31) if seed is None else int(seed)
-        self.rng = random.Random(self.seed)
-
-    def run_gui(self, canvas, win):
-        _streak_reset(self)
-        px = int(round(7.0 * self.ppd))
-        dot_r = max(2, int(round(0.12 * self.ppd)))
-        ns = []
-        for _ in range((self.n_trials + 8) // 9):
-            block = list(range(1, 10))
-            self.rng.shuffle(block)
-            ns.extend(block)
-        ns = ns[:self.n_trials]
-        self.rng.shuffle(ns)
-        correct = 0
-        try:
-            for t, n in enumerate(ns):
-                seed = self.rng.randrange(2 ** 31)
-                cx, cy = center(canvas)
-                canvas.delete('all')
-                fixation(canvas, cx, cy)
-                show_img(canvas, cx, cy, dot_cloud(px, n, dot_r=dot_r, seed=seed))
-                canvas.create_text(cx, cy + 200, text='How many dots? press 1-9', fill='white')
-                win.update()
-                r, rt = get_key(win, [str(i) for i in range(1, 10)])
-                ok = int(r) == n
-                correct += ok
-                self.logger.log_trial(test=self.name, trial=t + 1, level=n,
-                                      correct=ok, rt_s=round(rt, 3), response=int(r), n_dots=n,
-                                      seed=seed, px=px)
-                if self.feedback:
-                    arcade_feedback(self, canvas, win, cx, cy, ok)
-                    wait_ms(win, 300)
-        except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e, kind=self.kind,
-                         n_completed=len([r for r in self.logger.trials
-                                         if r.get('test') == self.name]),
-                         n_hit=correct, ppd=self.ppd, seed=self.seed)
-            raise
-        self.logger.end_test(test=self.name, kind=self.kind,
-                             accuracy=round(correct / self.n_trials, 3),
-                             n_trials=self.n_trials, ppd=self.ppd, seed=self.seed)
-        cx, cy = center(canvas)
-        canvas.delete('all')
-        canvas.create_text(cx, cy,
-                           text=f'{self.name}\nAccuracy {correct}/{self.n_trials}\nPress any key',
-                           font=('Arial', 18), justify='center')
-        win.update()
-        wait_dismiss(win)
-        return correct / self.n_trials, [correct, self.n_trials]
-
-
-class HueOrdering:
-    """Six static hue chips in scrambled order; click them light→dark.
-    Score = mean displacement from correct order."""
-    kind = 'hueorder'
-
-    def __init__(self, name, logger, n_trials=6, ppd=43.0, seed=None,
-                 feedback=True):
-        self.name = name
-        self.logger = logger
-        self.n_trials = max(1, int(n_trials))
-        self.ppd = ppd
-        self.feedback = feedback
-        self.seed = random.randrange(2 ** 31) if seed is None else int(seed)
-        self.rng = random.Random(self.seed)
-        self.np_rng = np.random.default_rng(self.seed)
-
-    def _wait_click(self, canvas, win, order, picked, x0, spacing, hit_r, cy,
-                      timeout=RESPONSE_TIMEOUT_S):
-        done, quit_ = [], []
-
-        def click(e, order=order):
-            for i, ci in enumerate(order):
-                x = x0 + i * spacing
-                if abs(e.x - x) < hit_r and abs(e.y - cy) < hit_r and ci not in picked:
-                    picked.append(ci)
-                    done.append(1)
-
-        def esc(e):
-            if e.keysym == 'Escape':
-                quit_.append(1)
-        canvas.bind('<Button-1>', click)
-        win.bind('<KeyPress>', esc)
-        win.focus_force()
-        t0 = time.perf_counter()
-        try:
-            while not done and not quit_:
-                if not win.winfo_exists():
-                    raise RuntimeError("Stimulus window closed before response")
-                if (time.perf_counter() - t0) > timeout:
-                    raise TimeoutError(f"No response within {timeout:.0f}s")
-                win.update()
-                time.sleep(0.02)
-        finally:
-            try:
-                canvas.unbind('<Button-1>')
-            except Exception:
-                pass
-            try:
-                if win.winfo_exists():
-                    win.unbind('<KeyPress>')
-            except Exception:
-                pass
-        if quit_:
-            raise QuitExperiment("Participant pressed Escape")
-
-    def run_gui(self, canvas, win):
-        _streak_reset(self)
-        chips = hue_chips()
-        lum = [0.299 * r + 0.587 * g + 0.114 * b for r, g, b in chips]
-        truth = sorted(range(6), key=lambda i: lum[i], reverse=True)
-        chip_px = int(round(1.8 * self.ppd))
-        spacing = int(round(2.3 * self.ppd))
-        hit_r = int(round(1.0 * self.ppd))
-        scores = []
-        try:
-            for t in range(self.n_trials):
-                order = list(range(6))
-                self.rng.shuffle(order)
-                cx, cy = center(canvas)
-                picked = []
-                x0 = cx - spacing * 2.5
-
-                def redraw():
-                    canvas.delete('all')
-                    msg = f'Trial {t + 1}/{self.n_trials}: click chips LIGHTEST → DARKEST'
-                    canvas.create_text(cx, cy - 160, text=msg,
-                                       fill='white', font=('Arial', 14))
-                    for i, ci in enumerate(order):
-                        x = x0 + i * spacing
-                        img = solid_patch(chip_px, chips[ci])
-                        tk_img = pil_to_tk(img)
-                        setattr(canvas, f'hue{i}', tk_img)
-                        tag = f'chip{i}'
-                        canvas.create_image(x, cy, image=tk_img, tags=tag)
-                        if ci in picked:
-                            canvas.create_text(x, cy + chip_px // 2 + 20,
-                                                 text=str(picked.index(ci) + 1),
-                                                 fill='yellow', font=('Arial', 18, 'bold'))
-                    win.update()
-                redraw()
-                while len(picked) < 6:
-                    self._wait_click(canvas, win, order, picked, x0, spacing, hit_r, cy)
-                    redraw()
-                score = float(np.mean([abs(picked.index(c) - truth.index(c)) for c in range(6)]))
-                scores.append(score)
-                self.logger.log_trial(test=self.name, trial=t + 1, level=round(score, 3),
-                                      correct=score == 0, rt_s='', order=list(map(int, picked)))
-                perfect = score == 0
-                msg = 'PERFECT! Score 0.00' if perfect else f'Score {score:.2f} (0 = perfect)'
-                arcade_toast(canvas, win, cx, cy, msg,
-                             fill='gold' if perfect else 'white', size=20,
-                             sound='correct' if (perfect and self.feedback) else None)
-                wait_ms(win, 800)
-        except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
-            record_abort(self.logger, self.name, e, kind=self.kind,
-                         n_completed=len(scores), n_trials=self.n_trials,
-                         ppd=self.ppd, seed=self.seed)
-            raise
-        m = float(np.mean(scores))
-        self.logger.end_test(test=self.name, kind=self.kind,
-                             mean_displacement=round(m, 3), n_trials=self.n_trials,
-                             ppd=self.ppd, seed=self.seed)
-        return m, scores
-
-
 class SizeMatch:
     """Left disc fixed; Up/Down resizes right disc; Enter when equal.
     Reports bias = matched/reference - 1 per trial (illusion strength)."""
@@ -1091,8 +856,11 @@ class SizeMatch:
 
 
 class MaskedGabor(Base):
-    """Brief static Gabor (~50 ms) then noise mask. Y = stripes, N = nothing.
+    """Brief Gabor (~50 ms) then noise mask. Y = stripes, N = nothing.
 
+    Every trial shows identical timing: 50 ms stimulus then 200 ms mask.
+    Signal trials show a Gabor; no-signal trials show fresh random noise,
+    so timing and texture never cue the answer — only the pattern does.
     Absent trials are catches (excluded from the staircase); the summary
     reports hit rate, false-alarm rate and d' alongside the threshold."""
     kind = 'masked'
@@ -1111,12 +879,16 @@ class MaskedGabor(Base):
         present = True if not main else bool(self.np_rng.random() < 0.5)
         if not main:
             contrast = max(contrast, 0.5)
-        dur = 50 if main else 300
+        dur = 50
         cx, cy = center(canvas)
         canvas.delete('all')
         fixation(canvas, cx, cy)
-        show_img(canvas, cx, cy,
-                 gabor_patch(self.px, self.ppd, 2.0, contrast) if present else blank_patch(self.px))
+        if present:
+            stim = gabor_patch(self.px, self.ppd, 2.0, contrast)
+        else:
+            foil_seed = int(self.np_rng.integers(2 ** 31))
+            stim = noise_mask(self.px, seed=foil_seed)
+        show_img(canvas, cx, cy, stim)
         win.update()
         shown_ms = wait_ms(win, dur)
         canvas.delete('all')

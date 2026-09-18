@@ -145,7 +145,7 @@ def test_viewer_ranked_card_shows_xp():
 def test_fixed_trial_classes_accept_feedback_flag():
     from . import tests as T
     import inspect
-    for cls in (T.HueOrdering, T.SizeMatch, T.StaticReactionTime):
+    for cls in (T.SizeMatch, T.StaticReactionTime):
         assert "feedback" in inspect.signature(cls.__init__).parameters
 
 

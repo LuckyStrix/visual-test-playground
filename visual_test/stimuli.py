@@ -139,22 +139,7 @@ def bright_disc(size_px, lum=255, bg=BG):
     return Image.fromarray(arr)
 
 
-def collinear_segments(size_px, offset_px, gap_px=None, lum=235, bg=BG):
-    """Two horizontal white bars left/right of center, right bar shifted
-    vertically by offset_px. Judge: aligned (Y) or offset (N)?"""
-    s = int(size_px)
-    gap_px = int(round(s * 0.08)) if gap_px is None else gap_px
-    arr = np.full((s, s, 3), bg, dtype=np.uint8)
-    yy, xx = np.mgrid[0:s, 0:s]
-    c = s // 2
-    bar_h, bar_w = max(3, s // 40), s // 3
-    left = (np.abs(yy - c) <= bar_h // 2) & (xx >= c - gap_px - bar_w) & (xx <= c - gap_px)
-    off = int(round(offset_px))
-    right = ((np.abs(yy - (c + off)) <= bar_h // 2) & (xx >= c + gap_px)
-             & (xx <= c + gap_px + bar_w))
-    arr[left] = (_clip(lum),) * 3
-    arr[right] = (_clip(lum),) * 3
-    return Image.fromarray(arr)
+
 
 
 def brightness_pair(size_px, patch=128, patch_right=None, dark_ring=40, light_ring=220):

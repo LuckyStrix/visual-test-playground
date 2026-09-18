@@ -24,8 +24,8 @@ catches (hit/FA/d′ in the JSON summary).
 
 - contrast / acuity / color — transformed staircases
 - static_contrast / static_color / masked — yes/no + d′
-- collinear / brightness / vernier — hyperacuity/illusion staircases
-- static_rt / subitize / hueorder / sizematch — fixed-trial probes
+- brightness / vernier — hyperacuity/illusion staircases
+- static_rt / sizematch — fixed-trial probes
 
 Tick checkboxes to pick which tests run in one session ("Select all" /
 "Clear" helpers, "START SESSION" runs them in listed order into a single
@@ -34,8 +34,7 @@ session; responses time out after 60 s. Pressing Esc on the final
 "done" screen dismisses it without aborting the test.
 
 Every test takes an optional `seed=`; the chosen seed is stored in the
-JSON summary, so any session can be replayed exactly. Subitizing also
-logs the per-trial dot seed. Simple-RT responses under 100 ms are
+JSON summary, so any session can be replayed exactly. Simple-RT responses under 100 ms are
 flagged `anticipatory` and retried as false starts.
 
 ## Data
@@ -56,7 +55,7 @@ Legacy exports from older schema versions live in
 Zero-byte CSVs from aborted sessions are kept in
 `data/incomplete/` for audit.
 
-Yes/no tasks (static_contrast, static_color, masked, collinear,
+Yes/no tasks (static_contrast, static_color, masked,
 brightness) exclude no-signal trials from the staircase and report
 hit rate / false-alarm rate / d′ in the JSON summary, so response bias
 is flagged instead of silently becoming a "threshold".

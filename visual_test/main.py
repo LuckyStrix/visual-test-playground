@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 try:
     from .tests import (ContrastDetection2IFC, Acuity4AFC, ColorDiscrimination2IFC,
                         StaticContrast, StaticColorBullseye, StaticReactionTime,
-                        CollinearJudgment, BrightnessMatch, VernierJudgment,
-                        Subitizing, HueOrdering, SizeMatch, MaskedGabor,
+                        BrightnessMatch, VernierJudgment,
+                        SizeMatch, MaskedGabor,
                         QuitExperiment)
     from .datalogger import DataLogger
     from .calibration import compute_geometry, nyquist_ok, DisplayProfile, pooling_flags
@@ -16,8 +16,8 @@ try:
 except ImportError:
     from tests import (ContrastDetection2IFC, Acuity4AFC, ColorDiscrimination2IFC,
                        StaticContrast, StaticColorBullseye, StaticReactionTime,
-                       CollinearJudgment, BrightnessMatch, VernierJudgment,
-                       Subitizing, HueOrdering, SizeMatch, MaskedGabor,
+                       BrightnessMatch, VernierJudgment,
+                       SizeMatch, MaskedGabor,
                        QuitExperiment)
     from datalogger import DataLogger
     from calibration import compute_geometry, nyquist_ok, DisplayProfile, pooling_flags
@@ -26,8 +26,6 @@ except ImportError:
 
 
 STAIR_DEFAULTS = {
-    'collinear': dict(start_val=-1.0, step_sizes=[0.3, 0.2, 0.1, 0.05],
-                      n_reversals=8, min_val=-3.0, max_val=0.0, rule='3D1U'),
     'brightness': dict(start_val=1.0, step_sizes=[0.3, 0.2, 0.1],
                        n_reversals=8, min_val=0.0, max_val=1.8, rule='3D1U'),
     'vernier': dict(start_val=-1.3, step_sizes=[0.3, 0.2, 0.1],
@@ -46,17 +44,14 @@ STAIR_DEFAULTS = {
                    n_reversals=8, min_val=0.3, max_val=2.0, rule='3D1U'),
 }
 
-FIXED_TRIAL_KINDS = ('subitize', 'hueorder', 'sizematch', 'static_rt')
+FIXED_TRIAL_KINDS = ('sizematch', 'static_rt')
 
 TEST_ORDER = [
     ('STATIC contrast: stripes there or not? (Y/N)', 'static_contrast'),
     ('STATIC colour bullseye: center redder or bluer? (R/B)', 'static_color'),
     ('STATIC reaction time: press SPACE when disc pops (no memory)', 'static_rt'),
-    ('Collinearity: are the two segments aligned? (Y/N)', 'collinear'),
     ('Brightness match: same grey on dark vs light ring?', 'brightness'),
     ('Vernier: lower bar left or right? (Left/Right)', 'vernier'),
-    ('How many dots? (1-9 keys)', 'subitize'),
-    ('Order 6 hues light->dark (click in order)', 'hueorder'),
     ('Size match: adjust disc, Enter when equal (bias)', 'sizematch'),
     ('Masked Gabor: stripes there? (Y/N, brief+mask)', 'masked'),
     ('Contrast detection (2IFC Gabor, 3D1U)', 'contrast'),
@@ -69,11 +64,8 @@ INSTR = {
                        'Keys: R = redder, B = bluer'),
     'static_rt': ('STATIC: wait, then press SPACE the instant the disc pops up.\n'
                   'No memory, just react.'),
-    'collinear': 'STATIC: are the two white bars ALIGNED?\nKeys: Y = aligned, N = offset',
     'brightness': 'STATIC: are the two grey patches the SAME grey?\nKeys: Y = same, N = different',
     'vernier': 'STATIC: is the LOWER bar LEFT or RIGHT of the upper?\nKeys: Left / Right arrows',
-    'subitize': 'STATIC: how many dots? Press 1-9.',
-    'hueorder': 'STATIC: click the 6 colour chips LIGHTEST to DARKEST.',
     'sizematch': 'STATIC: Up/Down resizes right disc, Enter when it equals left.',
     'masked': 'STATIC: brief flash then noise — stripes there?\nKeys: Y = yes, N = no',
     'contrast': 'Which interval had the striped patch?\nKeys: 1 = first, 2 = second',
@@ -157,7 +149,8 @@ class VisualTestApp:
         # Difficulty frame
         difficulty_frame = tk.Frame(pf)
         difficulty_frame.pack(fill='x', pady=(4,0))
-        tk.Label(difficulty_frame, text='Difficulty:', font=('Arial', 11, 'bold')).pack(side='left', padx=(0, 10))
+        label = tk.Label(difficulty_frame, text='Difficulty:', font=('Arial', 11, 'bold'))
+        label.pack(side='left', padx=(0, 10))
         self.difficulty_var = tk.StringVar(value='normal')
         difficulties = [
                 ('Easy', 'easy'),
@@ -166,7 +159,8 @@ class VisualTestApp:
                 ('Extreme', 'extreme'),
             ]
         for text, value in difficulties:
-            rb = tk.Radiobutton(difficulty_frame, text=text, variable=self.difficulty_var, value=value)
+            rb = tk.Radiobutton(difficulty_frame, text=text,
+                                variable=self.difficulty_var, value=value)
             rb.pack(side='left', padx=2)
 
         self.profile_lbl = tk.StringVar(value=f"Saving to: {self.logger.csv_path}")
@@ -596,22 +590,12 @@ class VisualTestApp:
         else:
             adjusted_sp = sp
 
-        if kind == 'collinear':
-            return CollinearJudgment(
-                'Collinearity Y/N', self.logger, ppd, dict(adjusted_sp), **base
-            )
         if kind == 'brightness':
             return BrightnessMatch(
                 'Brightness same/diff', self.logger, ppd, dict(adjusted_sp), **base
             )
         if kind == 'vernier':
             return VernierJudgment('Vernier L/R', self.logger, ppd, dict(adjusted_sp), **base)
-        if kind == 'subitize':
-            return Subitizing('Subitizing 1-9', self.logger, n_trials=n, feedback=fb,
-                               ppd=ppd, seed=seed)
-        if kind == 'hueorder':
-            return HueOrdering('Hue ordering', self.logger, n_trials=n, ppd=ppd, seed=seed,
-                               feedback=fb)
         if kind == 'sizematch':
             return SizeMatch('Size match bias', self.logger, n_trials=n, ppd=ppd, seed=seed,
                             feedback=fb)
@@ -882,11 +866,7 @@ class VisualTestApp:
                      f'{misses} misses, {fas} false starts')
             messagebox.showinfo('Done', f'{test.name}\nMedian RT: {med_txt}\n'
                                 f'Hits: {len(rts)} Misses: {misses}\nFalse starts: {fas}')
-        elif kind == 'subitize':
-            acc, (hits, total) = out
-            self.log(f'Done. {test.name} accuracy={acc:.3f} ({hits}/{total})')
-            messagebox.showinfo('Done', f'{test.name}\nAccuracy: {acc:.3f} ({hits}/{total})')
-        elif kind in ('hueorder', 'sizematch'):
+        elif kind == 'sizematch':
             score, per_trial = out
             detail = f' over {len(per_trial)} trials' if per_trial else ''
             self.log(f'Done. {test.name} score={score:.3f}{detail}')

@@ -14,8 +14,6 @@ def test_extract_staircase_kinds():
     got = N.extract("acuity", {"threshold_log": 0.0})
     assert got["display"].startswith("20/20")
     assert N.extract("static_rt", {"median_rt_s": 0.25})["value"] == 250.0
-    assert N.extract("subitize", {"accuracy": 0.9})["higher_better"] is True
-    assert N.extract("hueorder", {"mean_displacement": 0.5})["value"] == 0.5
     assert N.extract("sizematch", {"mean_bias": -0.05})["display"].startswith("-5.0%")
     assert N.extract("contrast", {"aborted": True}) is None
     assert N.extract("contrast", {}) is None
@@ -133,11 +131,8 @@ def test_kind_tags_present_in_summaries(tmp_path):
 
     lg = DataLogger("K", data_dir=str(tmp_path))
     lg.end_test(test="X", kind="contrast", threshold_log=-1.0)
-    lg.end_test(test="Y", kind="subitize", accuracy=0.9)
     assert lg.tests[0]["kind"] == "contrast"
-    assert lg.tests[1]["kind"] == "subitize"
     assert T.ContrastDetection2IFC.kind == "contrast"
-    assert T.Subitizing.kind == "subitize"
 
 
 def test_export_commands(tmp_path, capsys):
@@ -160,8 +155,6 @@ def test_export_commands(tmp_path, capsys):
 def test_fixed_trial_tests_honor_seed(tmp_path):
     from . import tests as T
 
-    assert T.Subitizing.kind == "subitize"
-    assert T.HueOrdering.kind == "hueorder"
     assert T.SizeMatch.kind == "sizematch"
     assert T.StaticReactionTime.kind == "static_rt"
 
@@ -172,8 +165,7 @@ def test_fixed_trial_tests_honor_seed(tmp_path):
         t.rng.shuffle(seq)
         return seq
 
-    for cls, kw in [(T.Subitizing, {}), (T.HueOrdering, {}),
-                    (T.SizeMatch, {}), (T.StaticReactionTime, {})]:
+    for cls, kw in [(T.SizeMatch, {}), (T.StaticReactionTime, {})]:
         assert shuffle_seq(cls, 42, **kw) == shuffle_seq(cls, 42, **kw)
         assert shuffle_seq(cls, 42, **kw) != shuffle_seq(cls, 43, **kw)
 
@@ -182,7 +174,7 @@ def test_fixed_trial_tests_honor_seed(tmp_path):
     from . import main as M
 
     src = inspect.getsource(M.VisualTestApp.make_test)
-    assert src.count("seed=seed") >= 4
+    assert src.count("seed=seed") >= 3
 
 
 def test_session_label_handles_legacy_keys():
