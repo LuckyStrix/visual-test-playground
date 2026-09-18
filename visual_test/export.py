@@ -63,9 +63,7 @@ def pooled_rows(data_dir, include_archive=False):
                         "display": got["display"] if got else "",
                         "n_trials": s.get("n_trials", ""),
                         "n_reversals": s.get("n_reversals", ""),
-                        "reversals": ";".join(
-                            str(v) for v in (s.get("reversals") or [])
-                        ),
+                        "reversals": ";".join(str(v) for v in (s.get("reversals") or [])),
                         "reversal_sd": s.get("reversal_sd", ""),
                         "weibull_alpha": s.get("weibull_alpha", ""),
                         "weibull_beta": s.get("weibull_beta", ""),
@@ -78,21 +76,13 @@ def pooled_rows(data_dir, include_archive=False):
                         "seed": s.get("seed", ""),
                         "start_val": s.get("start_val", ""),
                         "start_val_orig": s.get("start_val_orig", ""),
-                        "difficulty": s.get(
-                            "difficulty", meta.get("difficulty", "")
-                        ),
-                        "difficulty_adj": s.get(
-                            "difficulty_adj", meta.get("difficulty_adj", "")
-                        ),
+                        "difficulty": s.get("difficulty", meta.get("difficulty", "")),
+                        "difficulty_adj": s.get("difficulty_adj", meta.get("difficulty_adj", "")),
                         "display_gamma": meta.get("display_gamma_estimate", ""),
                         "display_refresh_hz": meta.get("display_refresh_hz", ""),
                         "display_ambient": meta.get("display_ambient", ""),
-                        "display_brightness_pct": meta.get(
-                            "display_brightness_pct", ""
-                        ),
-                        "display_night_mode_off": meta.get(
-                            "display_night_mode_off", ""
-                        ),
+                        "display_brightness_pct": meta.get("display_brightness_pct", ""),
+                        "display_night_mode_off": meta.get("display_night_mode_off", ""),
                     }
                 )
     return rows

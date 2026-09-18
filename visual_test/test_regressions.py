@@ -69,7 +69,11 @@ def headless(monkeypatch):
 
 def _sp(s, mn, mx):
     return dict(
-        start_val=s, step_sizes=[0.3, 0.2, 0.1], n_reversals=4, min_val=mn, max_val=mx,
+        start_val=s,
+        step_sizes=[0.3, 0.2, 0.1],
+        n_reversals=4,
+        min_val=mn,
+        max_val=mx,
         rule="3D1U",
     )
 
@@ -77,8 +81,13 @@ def _sp(s, mn, mx):
 def test_staircase_plots_include_kind(tmp_path, monkeypatch):
     lg = DataLogger("TEST", data_dir=str(tmp_path))
     t = T.ContrastDetection2IFC(
-        "C", lg, ppd=43.0, staircase_params=_sp(-1.0, -3.0, 0.0),
-        n_trials=4, practice_trials=0, seed=7,
+        "C",
+        lg,
+        ppd=43.0,
+        staircase_params=_sp(-1.0, -3.0, 0.0),
+        n_trials=4,
+        practice_trials=0,
+        seed=7,
     )
     monkeypatch.setattr(T, "get_key", lambda w, valid, **k: ("1", 0.25))
     t.run_gui(DummyCanvas(), DummyWin())
