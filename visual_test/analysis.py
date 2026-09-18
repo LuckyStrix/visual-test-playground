@@ -190,8 +190,10 @@ def plot_staircase(levels, reversals, reversal_trials=None, title="", path="stai
     ax.set_title(title)
     ax.grid(alpha=0.3)
     fig.tight_layout()
-    fig.savefig(path, dpi=140)
-    plt.close(fig)
+    try:
+        fig.savefig(path, dpi=140)
+    finally:
+        plt.close(fig)
     return path
 
 
@@ -231,6 +233,8 @@ def plot_psychometric(fit, title="", path="psychometric.png"):
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
-    fig.savefig(path, dpi=140)
-    plt.close(fig)
+    try:
+        fig.savefig(path, dpi=140)
+    finally:
+        plt.close(fig)
     return path

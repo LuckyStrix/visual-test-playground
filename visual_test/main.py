@@ -665,15 +665,15 @@ class VisualTestApp:
         """Get adjustment for test difficulty based on user selection - modifies start_val"""
         difficulty = self.difficulty_var.get()
         if difficulty == "easy":
-            return -1.0  # Easier: start with stronger stimulus (higher start_val)
+            return -1.0
         elif difficulty == "normal":
-            return 0.0  # Normal: no adjustment
+            return 0.0
         elif difficulty == "hard":
-            return 1.0  # Harder: start with weaker stimulus (lower start_val)
+            return 1.0
         elif difficulty == "extreme":
-            return 2.0  # Extreme: start with much weaker stimulus
+            return 2.0
         else:
-            return 0.0  # Default to normal
+            return 0.0
 
     def make_test(self, kind, n, fb, seed=None):
         ppd = self.ppd
@@ -704,18 +704,12 @@ class VisualTestApp:
         difficulty = self.difficulty_var.get() if hasattr(self, "difficulty_var") else "normal"
         difficulty_adj = self.get_difficulty_adjustment()
         if sp:
-            # Create a copy to avoid modifying the original
             adjusted_sp = sp.copy()
-            # Apply difficulty adjustment to start_val
             original_start = adjusted_sp["start_val"]
-            # Subtract because: easier = higher start_val
             new_start = original_start - difficulty_adj
-
-            # Clamp to reasonable bounds (but respect the original min/max)
             min_bound = adjusted_sp.get("min_val", -10.0)
             max_bound = adjusted_sp.get("max_val", 10.0)
             new_start = max(min_bound, min(max_bound, new_start))
-
             adjusted_sp["start_val"] = new_start
             adjusted_sp["start_val_orig"] = original_start
             adjusted_sp["difficulty"] = difficulty
@@ -731,7 +725,14 @@ class VisualTestApp:
             return VernierJudgment("Vernier L/R", self.logger, ppd, dict(adjusted_sp), **base)
         if kind == "sizematch":
             return SizeMatch(
-                "Size match bias", self.logger, n_trials=n, ppd=ppd, seed=seed, feedback=fb
+                "Size match bias",
+                self.logger,
+                n_trials=n,
+                ppd=ppd,
+                seed=seed,
+                feedback=fb,
+                difficulty=difficulty,
+                difficulty_adj=difficulty_adj,
             )
         if kind == "masked":
             return MaskedGabor("Masked Gabor Y/N", self.logger, ppd, dict(adjusted_sp), **base)
@@ -745,7 +746,14 @@ class VisualTestApp:
             )
         if kind == "static_rt":
             return StaticReactionTime(
-                "Static Reaction Time", self.logger, n_trials=n, ppd=ppd, seed=seed, feedback=fb
+                "Static Reaction Time",
+                self.logger,
+                n_trials=n,
+                ppd=ppd,
+                seed=seed,
+                feedback=fb,
+                difficulty=difficulty,
+                difficulty_adj=difficulty_adj,
             )
         if kind == "contrast":
             return ContrastDetection2IFC(

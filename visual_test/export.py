@@ -134,10 +134,12 @@ def cmd_pooled(data_dir, out_path, include_archive=False):
         "display_brightness_pct",
         "display_night_mode_off",
     ]
-    with open(out_path, "w", newline="") as f:
+    tmp_path = out_path + ".tmp"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
+    os.replace(tmp_path, out_path)
     print(f"wrote {len(rows)} rows to {out_path}")
     return 0
 

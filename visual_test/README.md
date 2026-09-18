@@ -19,13 +19,11 @@ python3 -m pytest visual_test/ -q # headless checks
 
 ## Tests
 
-Forced-choice (2IFC/4AFC) staircases converge to 70.7%/79.4% correct
-(3D1U); yes/no tasks feed signal trials only, with no-signal trials as
-catches (hit/FA/d′ in the JSON summary).
+Forced-choice (2IFC/4AFC) staircases converge to 79.4% correct
+(3D1U); yes/no tasks feed signal trials only, with catch trials excluded
+from the staircase (hit/FA/d′ in the JSON summary).
 
-- contrast / acuity / color — transformed staircases
-- static_contrast / static_color / masked — yes/no + d′
-- brightness / vernier — hyperacuity/illusion staircases
+- contrast / acuity / color / static_contrast / static_color / masked / brightness / vernier — transformed staircases
 - static_rt / sizematch — fixed-trial probes
 
 Tick checkboxes to pick which tests run in one session ("Select all" /
@@ -35,14 +33,15 @@ session; responses time out after 60 s. Pressing Esc on the final
 "done" screen dismisses it without aborting the test.
 
 Every test takes an optional `seed=`; the chosen seed is stored in the
-JSON summary, so any session can be replayed exactly. Simple-RT responses under 100 ms are
+JSON summary, so any session can be replayed exactly. Simple-RT responses under 50 ms are
 flagged `anticipatory` and retried as false starts.
 
 ## Data
 
 One `PARTICIPANT_SESSION_trials.csv` + `PARTICIPANT_SESSION.json` per
-session in `data/sessions/`, plus auto-saved `*_staircase.png` /
-`*_psychometric.png` plots in `data/sessions/plots/`. The JSON is rewritten
+session in `data/sessions/`, plus auto-saved `*_<kind>_staircase.png` /
+`*_<kind>_psychometric.png` plots (fixed probes save `*_<kind>_fixed.png`)
+in `data/sessions/plots/`. The JSON is rewritten
 after every trial, so a crash or abort still leaves trial rows plus a
 partial summary. `end_test` records ppd, rule, step sizes, reversals,
 reversal trial indices, a `truncated` flag when the trial budget
@@ -58,7 +57,8 @@ profile switch (see `set_participant`); `data/incomplete/` is kept for
 legacy audit files only.
 
 Yes/no tasks (static_contrast, static_color, masked,
-brightness) exclude no-signal trials from the staircase and report
+brightness) exclude catch trials (absent signals, zero-delta colours,
+same-patch brightness) from the staircase and report
 hit rate / false-alarm rate / d′ in the JSON summary, so response bias
 is flagged instead of silently becoming a "threshold".
 

@@ -13,7 +13,7 @@ TEST_INFO = {
         "what": (
             "One Gabor patch of stripes flashed on screen half the time. "
             "You answered stripes-or-nothing. Threshold = faintest stripes "
-            "seen ~79% of the time."
+            "reliably told apart from blanks."
         ),
         "unit": "lower % = sees fainter stripes",
         "good": "Low contrast threshold with high hit rate and low false alarms.",
@@ -26,8 +26,8 @@ TEST_INFO = {
         "title": "Static colour bullseye",
         "what": (
             "Center vs surround discs differ along red-blue. You judged the "
-            "center redder or bluer. Threshold = smallest colour step told "
-            "apart ~79% of the time."
+            "center redder or bluer. Threshold = smallest colour step "
+            "reliably told apart."
         ),
         "unit": "smaller step = finer colour discrimination",
         "good": "Small delta with symmetric red/blue answers.",
@@ -126,9 +126,8 @@ def flags_for(summary):
         out.append("hit the 1-pixel display floor on some trials")
     if s.get("n_catch") == 0 and "d_prime" in s:
         out.append("no catch trials recorded; bias unchecked")
-    if "median_rt_s" in s and s.get("median_rt_s") is None:
+    if "median_rt_s" in s and (s["median_rt_s"] is None or s["median_rt_s"] != s["median_rt_s"]):
         out.append("no hits recorded (all misses/false starts); RT undefined")
-
     return out
 
 

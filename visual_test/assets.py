@@ -266,24 +266,6 @@ def _play_sync(path):
     return proc.returncode == 0
 
 
-def play_sound(name, widget=None):
-    p = sound_path(name)
-    if p is None:
-        if widget is not None:
-            try:
-                widget.bell()
-            except Exception:
-                pass
-        return False
-    ok = _play_sync(p)
-    if not ok and widget is not None:
-        try:
-            widget.bell()
-        except Exception:
-            pass
-    return ok
-
-
 def _can_play():
     try:
         import importlib.util

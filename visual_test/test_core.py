@@ -255,7 +255,7 @@ def test_sizematch(tmp_path, monkeypatch):
 def test_anticipatory_rt_retries_and_flags(tmp_path, monkeypatch):
     lg = DataLogger("TEST", data_dir=str(tmp_path))
     rt = T.StaticReactionTime("RT", lg, n_trials=1, ppd=43.0, seed=1)
-    seq = iter([0.05, 0.30])
+    seq = iter([0.04, 0.30])
     monkeypatch.setattr(T, "await_space", lambda w, t0, **k: next(seq))
     med, rts, misses, fas = rt.run_gui(DummyCanvas(), DummyWin())
     assert fas >= 1

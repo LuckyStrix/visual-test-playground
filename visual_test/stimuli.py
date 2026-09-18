@@ -206,6 +206,8 @@ def halftone_patch(size_px, check_px=2, lo=0, hi=255):
 def match_pair(total_w_px, patch_px, solid_level, check_px=2):
     """Side-by-side halftone reference (left) + adjustable solid (right).
 
+    total_w_px is legacy and unused (canvas sizes from patch_px); kept so
+    existing callers passing it positionally keep working.
     The halftone side is always a 0/255 checkerboard (one reference); callers
     vary the solid starting level across repetitions to reduce anchoring bias.
     """

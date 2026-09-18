@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 visual_test/data/sessions/*
 !visual_test/data/sessions/.gitkeep
 visual_test/data/display_profile.json

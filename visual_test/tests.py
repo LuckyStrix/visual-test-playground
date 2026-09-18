@@ -9,6 +9,7 @@ bias is flagged instead of silently becoming a "threshold".
 
 import random
 import time
+import warnings
 from statistics import NormalDist
 
 import numpy as np
@@ -77,10 +78,12 @@ def _save_fixed_plot(logger, name, kind, values, ylabel):
         ax.set_title(name)
         ax.grid(alpha=0.3)
         fig.tight_layout()
-        fig.savefig(os.path.join(plot_dir, f"{stem}_{kind}_fixed.png"), dpi=140)
-        plt.close(fig)
-    except Exception:
-        pass
+        try:
+            fig.savefig(os.path.join(plot_dir, f"{stem}_{kind}_fixed.png"), dpi=140)
+        finally:
+            plt.close(fig)
+    except (OSError, ValueError) as e:
+        warnings.warn(f"{name}: fixed plot skipped ({e})", stacklevel=2)
 
 
 class QuitExperiment(Exception):
@@ -88,7 +91,7 @@ class QuitExperiment(Exception):
 
 
 RESPONSE_TIMEOUT_S = 60.0
-MIN_RT_S = 0.1
+MIN_RT_S = 0.05
 
 
 class YesNoStats:
@@ -198,8 +201,9 @@ def wait_ms(win, ms):
     """Pump the event loop for ~ms milliseconds. Returns actual elapsed ms.
 
     Note: Tkinter has no vsync; durations are approximate (expect ±10 ms
-    jitter). For threshold work this is fine; do not use for TAC-grade
-    temporal psychophysics without photodiode verification."""
+    jitter). For threshold work this is fine; the calibration wizard
+    measures frame intervals separately, so do not use wait_ms for
+    refresh-rate estimation without photodiode verification."""
     try:
         ms = float(ms)
     except (TypeError, ValueError, OverflowError) as e:
@@ -504,6 +508,10 @@ class Base:
                 reversal_trials=list(self.stair.reversal_trials),
                 ppd=getattr(self, "ppd", None),
                 seed=self.seed,
+                start_val=round(float(self.stair.start_val), 4),
+                start_val_orig=self.sp.get("start_val_orig", self.sp.get("start_val")),
+                difficulty=self.sp.get("difficulty", "normal"),
+                difficulty_adj=self.sp.get("difficulty_adj", 0.0),
             )
             raise
         th = self.stair.threshold()
@@ -1018,7 +1026,17 @@ class SizeMatch:
 
     kind = "sizematch"
 
-    def __init__(self, name, logger, n_trials=10, ppd=43.0, seed=None, feedback=True):
+    def __init__(
+        self,
+        name,
+        logger,
+        n_trials=10,
+        ppd=43.0,
+        seed=None,
+        feedback=True,
+        difficulty="normal",
+        difficulty_adj=0.0,
+    ):
         self.name = name
         self.logger = logger
         self.n_trials = max(1, int(n_trials))
@@ -1026,6 +1044,8 @@ class SizeMatch:
         self.feedback = feedback
         self.seed = random.randrange(2**31) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
+        self.difficulty = difficulty
+        self.difficulty_adj = difficulty_adj
 
     def run_gui(self, canvas, win):
         _streak_reset(self)
@@ -1075,6 +1095,8 @@ class SizeMatch:
                 truncated=True,
                 ppd=self.ppd,
                 seed=self.seed,
+                difficulty=getattr(self, "difficulty", "normal"),
+                difficulty_adj=getattr(self, "difficulty_adj", 0.0),
             )
             raise
         m = float(np.mean(biases))
@@ -1088,6 +1110,8 @@ class SizeMatch:
             truncated=len(biases) < self.n_trials,
             ppd=self.ppd,
             seed=self.seed,
+            difficulty=getattr(self, "difficulty", "normal"),
+            difficulty_adj=getattr(self, "difficulty_adj", 0.0),
         )
         _save_fixed_plot(self.logger, self.name, self.kind, biases, "bias per trial")
         cx, cy = center(canvas)
@@ -1188,7 +1212,17 @@ class StaticReactionTime:
 
     kind = "static_rt"
 
-    def __init__(self, name, logger, n_trials=30, ppd=43.0, seed=None, feedback=True):
+    def __init__(
+        self,
+        name,
+        logger,
+        n_trials=30,
+        ppd=43.0,
+        seed=None,
+        feedback=True,
+        difficulty="normal",
+        difficulty_adj=0.0,
+    ):
         self.name = name
         self.logger = logger
         self.n_trials = max(1, int(n_trials))
@@ -1196,6 +1230,8 @@ class StaticReactionTime:
         self.feedback = feedback
         self.seed = random.randrange(2**31) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
+        self.difficulty = difficulty
+        self.difficulty_adj = difficulty_adj
 
     def run_gui(self, canvas, win):
         _streak_reset(self)
@@ -1352,6 +1388,8 @@ class StaticReactionTime:
                 truncated=True,
                 ppd=self.ppd,
                 seed=self.seed,
+                difficulty=getattr(self, "difficulty", "normal"),
+                difficulty_adj=getattr(self, "difficulty_adj", 0.0),
             )
             raise
         med = float(np.median(rts)) if rts else float("nan")
@@ -1370,6 +1408,8 @@ class StaticReactionTime:
             n_fa=fas,
             ppd=self.ppd,
             seed=self.seed,
+            difficulty=getattr(self, "difficulty", "normal"),
+            difficulty_adj=getattr(self, "difficulty_adj", 0.0),
         )
         _save_fixed_plot(
             self.logger, self.name, self.kind, [r * 1000.0 for r in rts], "RT per hit (ms)"
