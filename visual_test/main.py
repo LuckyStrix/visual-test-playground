@@ -378,13 +378,13 @@ class VisualTestApp:
                 docs.append((info, doc))
             values_by_kind = {}
             kinds_by_doc = []
-            for info, doc in docs:
+            for idx, (info, doc) in enumerate(docs):
                 per_doc = {}
                 try:
                     tests = doc.get("tests") or []
                 except Exception:
                     tests = []
-                for s in tests:
+                for ti, s in enumerate(tests):
                     if not isinstance(s, dict):
                         continue
                     if s.get("aborted") or s.get("truncated"):
@@ -398,24 +398,20 @@ class VisualTestApp:
                         continue
                     if got is None:
                         continue
-                    values_by_kind.setdefault(kind, []).append(got["value"])
-                    per_doc.setdefault(kind, []).append(got["value"])
+                    values_by_kind.setdefault(kind, []).append((idx, ti, got["value"]))
+                    per_doc.setdefault(kind, []).append((idx, ti))
                 kinds_by_doc.append((info, doc, per_doc))
             for _info, doc, per_doc in kinds_by_doc:
                 try:
                     group = {}
                     for kind, vals in values_by_kind.items():
                         own = per_doc.get(kind, [])
+                        own_set = set(own)
+                        remaining = [v for (i, t, v) in vals if (i, t) not in own_set]
                         if own:
-                            remaining = list(vals)
-                            for v in own:
-                                try:
-                                    remaining.remove(v)
-                                except ValueError:
-                                    pass
                             group[kind] = remaining
                         else:
-                            group[kind] = vals
+                            group[kind] = [v for (i, t, v) in vals]
                     for card in N.score_session(doc, group):
                         pct = card.get("percentile")
                         if pct is None:
@@ -656,6 +652,10 @@ class VisualTestApp:
         except ValueError:
             self.log(f"Bad seed {raw!r}; using random.")
             try:
+                self.logger.meta["seed_input_invalid"] = raw[:64]
+            except Exception:
+                pass
+            try:
                 messagebox.showwarning("Bad seed", f"{raw!r} is not an integer; using random.")
             except Exception:
                 pass
@@ -698,6 +698,14 @@ class VisualTestApp:
             difficulty_adj=self.get_difficulty_adjustment(),
             **self.display_profile.as_meta(),
         )
+        try:
+            by_kind = self.logger.meta.get("difficulty_by_kind")
+            if not isinstance(by_kind, dict):
+                by_kind = {}
+            by_kind[kind] = difficulty
+            self.logger.meta["difficulty_by_kind"] = by_kind
+        except Exception:
+            pass
 
         base = dict(n_trials=n, feedback=fb, practice_trials=3, seed=seed)
         sp = STAIR_DEFAULTS.get(kind)
@@ -807,7 +815,7 @@ class VisualTestApp:
         canvas.create_text(w // 2, 250, text=f"{title} — {tag}", font=("Arial", 16), fill="gold")
         canvas.create_text(w // 2, 275, text="(any key skips)", font=("Arial", 11), fill="#999")
         canvas.create_rectangle(x0, 300, x0 + bar_w, 322, outline="white")
-        fill = int(bar_w * i / total)
+        fill = int(bar_w * (i + 1) / total)
         if fill:
             canvas.create_rectangle(x0, 300, x0 + fill, 322, fill="#2e7d32", outline="")
         win.update()
@@ -870,6 +878,22 @@ class VisualTestApp:
             fb = True
         self._session_running = True
         seed_base = self.session_seed()
+        try:
+            import sys
+
+            self.logger.meta.update(
+                seed_base=seed_base,
+                seed_order=list(kinds),
+                python_version=sys.version.split()[0],
+            )
+            try:
+                import numpy as _np
+
+                self.logger.meta["numpy_version"] = _np.__version__
+            except Exception:
+                pass
+        except Exception:
+            pass
         for kind in kinds:
             if kind not in FIXED_TRIAL_KINDS:
                 need = STAIR_DEFAULTS[kind]["n_reversals"]

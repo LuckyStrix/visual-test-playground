@@ -38,6 +38,8 @@ def compute_geometry(screen_width_px, screen_height_px, diag_in, viewing_dist_cm
         raise ValueError("diag_in must be positive")
     if not isinstance(viewing_dist_cm, (int, float)) or viewing_dist_cm <= 0:
         raise ValueError("viewing_dist_cm must be positive")
+    if not math.isfinite(diag_in) or not math.isfinite(viewing_dist_cm):
+        raise ValueError("diag_in and viewing_dist_cm must be finite")
     diag_cm = diag_in * 2.54
     aspect = screen_width_px / max(1, screen_height_px)
     h_cm = diag_cm / math.sqrt(1 + aspect**2)

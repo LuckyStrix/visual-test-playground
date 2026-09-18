@@ -83,10 +83,14 @@ def extract(kind, summary):
         thr = _num(s.get("threshold_log"))
         if thr is None or not -0.5 <= thr <= 2.0:
             return None
+        floored = thr is not None and thr <= -0.2
         denom = 20.0 * (10.0**thr)
+        disp = f"20/{denom:.0f} (logMAR {thr:.2f})"
+        if floored:
+            disp += " [display floor: finest reachable on this rig]"
         return {
             "value": thr,
-            "display": f"20/{denom:.0f} (logMAR {thr:.2f})",
+            "display": disp,
             "higher_better": higher,
         }
     if kind in ("color", "static_color"):

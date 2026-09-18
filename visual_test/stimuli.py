@@ -16,6 +16,20 @@ def gabor_patch(
     size_px, ppd, sf_cpd, contrast, orientation_deg=0.0, phase_deg=90.0, sigma_deg=0.8, bg=BG
 ):
     size_px = int(size_px)
+    if size_px <= 0:
+        raise ValueError(f"gabor_patch requires size_px >= 1, got {size_px}")
+    try:
+        ppd = float(ppd)
+        sf_cpd = float(sf_cpd)
+        contrast = float(contrast)
+    except (TypeError, ValueError, OverflowError) as e:
+        raise ValueError(f"gabor_patch requires numeric ppd/sf_cpd/contrast: {e}") from e
+    if not math.isfinite(ppd) or ppd <= 0:
+        raise ValueError(f"gabor_patch requires finite ppd > 0, got {ppd}")
+    if not math.isfinite(sf_cpd) or sf_cpd < 0:
+        raise ValueError(f"gabor_patch requires finite sf_cpd >= 0, got {sf_cpd}")
+    if not math.isfinite(contrast) or contrast < 0:
+        raise ValueError(f"gabor_patch requires finite contrast >= 0, got {contrast}")
     sf_cpp = sf_cpd / ppd
     sigma_px = max(2.0, sigma_deg * ppd)
     ax = np.arange(size_px) - (size_px - 1) / 2.0

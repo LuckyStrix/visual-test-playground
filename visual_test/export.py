@@ -175,7 +175,14 @@ def cmd_summary(data_dir, include_archive=False):
 
 
 def cmd_report(data_dir, session_path):
-    text = session_report_text(session_path, os.path.dirname(os.path.abspath(session_path)))
+    own_dir = os.path.dirname(os.path.abspath(session_path))
+    if os.path.abspath(own_dir) != os.path.abspath(data_dir):
+        print(
+            f"note: norms use the session's own directory ({own_dir}), "
+            f"ignoring --data-dir ({data_dir})",
+            file=sys.stderr,
+        )
+    text = session_report_text(session_path, own_dir)
     if text is None:
         print(f"could not read {session_path}", file=sys.stderr)
         return 1

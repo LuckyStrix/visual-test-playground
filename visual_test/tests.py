@@ -462,7 +462,7 @@ class Base:
                     n_practice += 1
                     self.logger.log_trial(
                         test=self.name,
-                        trial=0,
+                        trial=f"p{n_practice}",
                         practice_trial=n_practice,
                         level=lvl,
                         correct=bool(ok),
@@ -495,17 +495,30 @@ class Base:
                 if done:
                     break
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
+            try:
+                _abort_sd = self.stair.reversal_sd()
+            except Exception:
+                _abort_sd = float("nan")
             record_abort(
                 self.logger,
                 self.name,
                 e,
                 kind=self.kind,
-                n_trials=len(levels),
+                n_trials=self.n_trials,
+                n_completed=len(levels),
+                n_presented=n_main,
                 n_catch=n_catch,
                 n_practice=n_practice,
                 n_reversals=len(self.stair.reversals),
                 reversals=[round(r, 3) for r in self.stair.reversals],
                 reversal_trials=list(self.stair.reversal_trials),
+                reversal_sd=round(_abort_sd, 4) if _abort_sd == _abort_sd else None,
+                clipped_levels=bool(getattr(self, "_clipped_levels", [])),
+                rule=self.stair.rule,
+                target_p=round(self.stair.target_p, 3),
+                step_sizes=list(self.stair.step_sizes),
+                threshold_n_discard=2,
+                truncated=True,
                 ppd=getattr(self, "ppd", None),
                 seed=self.seed,
                 start_val=round(float(self.stair.start_val), 4),
@@ -522,7 +535,9 @@ class Base:
             test=self.name,
             kind=self.kind,
             threshold_log=round(th, 4),
-            n_trials=len(levels),
+            n_trials=self.n_trials,
+            n_completed=len(levels),
+            n_presented=n_main,
             n_catch=n_catch,
             n_practice=n_practice,
             clipped_levels=clipped,
@@ -601,6 +616,7 @@ class Base:
                     weibull_beta=fit["beta"],
                     weibull_guess=fit["guess"],
                     weibull_lapse=fit["lapse"],
+                    weibull_fit_failed=bool(fit.get("fit_failed", False)),
                 )
                 self.logger.save()
         except Exception as e:
@@ -1020,7 +1036,8 @@ class VernierJudgment(Base):
             ok,
             rt,
             {
-                "offset_px": round(float(offset_px), 2),
+                "offset_px": int(round(float(offset_px))),
+                "offset_px_float": round(float(offset_px), 2),
                 "lower_right": bool(sign > 0),
                 "offset_clipped": bool(main and clipped),
             },
@@ -1060,7 +1077,8 @@ class SizeMatch:
         biases = []
         try:
             for t in range(self.n_trials):
-                cmp_d = ref * float(self.rng.uniform(0.7, 1.3))
+                cmp_init = ref * float(self.rng.uniform(0.7, 1.3))
+                cmp_d = cmp_init
                 cx, cy = center(canvas)
                 while True:
                     cmp_d = min(max(cmp_d, ref * 0.3), ref * 3.0)
@@ -1090,6 +1108,7 @@ class SizeMatch:
                     correct=True,
                     rt_s="",
                     matched=round(cmp_d, 1),
+                    cmp_init=round(cmp_init, 1),
                 )
         except (QuitExperiment, TimeoutError, RuntimeError, KeyboardInterrupt) as e:
             record_abort(
@@ -1250,6 +1269,7 @@ class StaticReactionTime:
         cx, cy = center(canvas)
         px = int(round(2.8 * self.ppd))
         trial_no = 0
+        n_attempts = 0
         try:
             for _t in range(self.n_trials):
                 while True:
@@ -1288,10 +1308,10 @@ class StaticReactionTime:
                         raise QuitExperiment("Participant pressed Escape")
                     if early:
                         fas += 1
-                        trial_no += 1
+                        n_attempts += 1
                         self.logger.log_trial(
                             test=self.name,
-                            trial=trial_no,
+                            trial=trial_no + 1,
                             level="n/a",
                             correct=False,
                             rt_s="",
@@ -1299,6 +1319,8 @@ class StaticReactionTime:
                             fa=True,
                             anticipatory=False,
                             foreperiod_abort=True,
+                            retry=True,
+                            attempt=n_attempts,
                             foreperiod_s=round(foreperiod, 3),
                         )
                         arcade_toast(
@@ -1320,9 +1342,10 @@ class StaticReactionTime:
                     win.update()
                     t0[0] = time.perf_counter()
                     rt = await_space(win, t0[0], timeout_s=1.5)
-                    trial_no += 1
                     if rt is None:
                         misses += 1
+                        trial_no += 1
+                        n_attempts += 1
                         self.logger.log_trial(
                             test=self.name,
                             trial=trial_no,
@@ -1332,19 +1355,23 @@ class StaticReactionTime:
                             miss=True,
                             fa=False,
                             anticipatory=False,
+                            attempt=n_attempts,
                             foreperiod_s=round(foreperiod, 3),
                         )
                     elif rt < MIN_RT_S:
                         fas += 1
+                        n_attempts += 1
                         self.logger.log_trial(
                             test=self.name,
-                            trial=trial_no,
+                            trial=trial_no + 1,
                             level="n/a",
                             correct=False,
                             rt_s=round(rt, 4),
                             miss=False,
                             fa=True,
                             anticipatory=True,
+                            retry=True,
+                            attempt=n_attempts,
                             foreperiod_s=round(foreperiod, 3),
                         )
                         arcade_toast(
@@ -1370,6 +1397,8 @@ class StaticReactionTime:
                             except Exception:
                                 pass
                         rts.append(rt)
+                        trial_no += 1
+                        n_attempts += 1
                         self.logger.log_trial(
                             test=self.name,
                             trial=trial_no,
@@ -1379,6 +1408,7 @@ class StaticReactionTime:
                             miss=False,
                             fa=False,
                             anticipatory=False,
+                            attempt=n_attempts,
                             foreperiod_s=round(foreperiod, 3),
                         )
                     break
@@ -1394,6 +1424,8 @@ class StaticReactionTime:
                 n_hit=len(rts),
                 n_miss=misses,
                 n_fa=fas,
+                n_attempts=n_attempts,
+                n_retries=n_attempts - trial_no,
                 n_trials=self.n_trials,
                 n_completed=trial_no,
                 truncated=True,
@@ -1417,6 +1449,8 @@ class StaticReactionTime:
             n_miss=n_miss,
             n_hit=len(rts),
             n_fa=fas,
+            n_attempts=n_attempts,
+            n_retries=n_attempts - trial_no,
             ppd=self.ppd,
             seed=self.seed,
             difficulty=getattr(self, "difficulty", "normal"),

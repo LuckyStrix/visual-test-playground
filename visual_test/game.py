@@ -233,8 +233,16 @@ def load_profile(participant, data_dir):
             doc = json.load(f)
         if isinstance(doc, dict):
             return _coerce_profile(doc, name)
-    except (OSError, ValueError):
-        pass
+        raise ValueError("profile is not a JSON object")
+    except (OSError, ValueError) as e:
+        try:
+            if os.path.exists(path):
+                os.replace(path, path + ".corrupt")
+        except OSError:
+            pass
+        import warnings
+
+        warnings.warn(f"game profile unreadable ({e}); starting fresh", stacklevel=2)
     return {
         "participant": name,
         "xp": 0,
@@ -376,15 +384,18 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
     if not cards:
         raise ValueError("no scored tests; skipping XP")
     name = _safe_participant(participant)
+    sid = None
     try:
-        sid = str(session_id)[:64] if session_id is not None else "unidentified"
+        if session_id is not None:
+            sid = str(session_id)[:64]
     except Exception:
-        sid = "unidentified"
+        sid = None
     with _PROFILE_LOCK:
         prof = load_profile(name, data_dir)
-        seen = {h.get("session") for h in (prof.get("history") or []) if isinstance(h, dict)}
-        if sid in seen:
-            return prof, 0, [], False
+        if sid is not None:
+            seen = {h.get("session") for h in (prof.get("history") or []) if isinstance(h, dict)}
+            if sid in seen:
+                return prof, 0, [], False
         old_level = level_for_xp(prof.get("xp", 0))
         old_badges = set(prof.get("badges") or [])
         rewards = summarize_rewards(cards, calibrated=calibrated)
@@ -395,7 +406,13 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
         new_badges = [b for b in rewards["badges"] if b not in old_badges]
         prof["badges"] = sorted(old_badges | set(rewards["badges"]))
         hist = prof.get("history") or []
-        hist.append({"session": sid, "xp": gained, "utc": prof["last_session_utc"]})
+        hist.append(
+            {
+                "session": sid if sid is not None else f"unidentified-{prof['last_session_utc']}",
+                "xp": gained,
+                "utc": prof["last_session_utc"],
+            }
+        )
         prof["history"] = hist[-50:]
         save_profile(name, data_dir, prof)
     new_level = level_for_xp(prof["xp"])

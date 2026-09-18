@@ -11,8 +11,8 @@ Static single-display visual screening battery (Tkinter + Pillow).
 
 ```bash
 pip install -r requirements.txt      # from repo root; pinned versions
-# or: pip install -e .[test]
 # GUI needs Tkinter too: sudo apt install python3-tk  (Debian/Ubuntu)
+# (also required to collect the test suite, which imports visual_test.main)
 python3 -m visual_test.main       # GUI
 python3 -m pytest visual_test/ -q # headless checks
 ```
@@ -33,7 +33,12 @@ session; responses time out after 60 s. Pressing Esc on the final
 "done" screen dismisses it without aborting the test.
 
 Every test takes an optional `seed=`; the chosen seed is stored in the
-JSON summary, so any session can be replayed exactly. Simple-RT responses under 50 ms are
+JSON summary, along with `seed_base` / `seed_order` / interpreter
+versions, stimulus seeds (`mask_seed`, `foil_seed`), and difficulty, so a
+session can be replayed bit-exactly for staircase tests. Limits: reaction
+time depends on a live human, Tkinter timing has ±10 ms jitter, and
+blank-seed sessions use OS entropy (per-test seeds still logged
+post-hoc). Simple-RT responses under 50 ms are
 flagged `anticipatory` and retried as false starts.
 
 ## Data
@@ -44,11 +49,15 @@ session in `data/sessions/`, plus auto-saved `*_<kind>_staircase.png` /
 in `data/sessions/plots/`. The JSON is rewritten
 after every trial, so a crash or abort still leaves trial rows plus a
 partial summary. `end_test` records ppd, rule, step sizes, reversals,
-reversal trial indices, a `truncated` flag when the trial budget
-expired before the reversal target, and the `seed` for exact replay.
+reversal trial indices, reversal SD, a `truncated` flag when the trial budget
+expired before the reversal target, the `seed` plus `seed_base` /
+`seed_order` / interpreter versions, `difficulty` (per-test
+`difficulty_by_kind` in `meta`), trial counts (`n_trials` requested,
+`n_completed`, `n_presented`, plus `n_attempts`/`n_retries` for RT), and the
+Weibull fit (`weibull_alpha/beta/guess/lapse/fit_failed`).
 Interrupted runs record `aborted: true` with an `abort_reason` instead
-of vanishing. Practice trials are logged with `practice: true` and
-counted as `n_practice` in the summary.
+of vanishing. Practice trials are logged with `practice: true`
+(`trial` keys `p1`, `p2`, …) and counted as `n_practice` in the summary.
 
 Legacy exports from older schema versions live in
 `data/legacy_archive/` (read-only reference; column names differ).
@@ -77,11 +86,12 @@ comparable across machines:
 - subjective gamma: match a solid patch to a halftone checkerboard at 3
   levels (Up/Down fine, Left/Right coarse, Enter confirms)
 - black steps visible on black (0-9) + white steps visible on white (0-9)
-- settings dialog: brightness %, ambient (dark/dim/office/daylight),
-  night-mode off?, free-text notes (display model, etc.)
+- settings dialog: brightness %, ambient ("dark room", "dim room",
+  "office", "daylight"), night-mode off?, free-text notes
 
-Every `display_*` field lands in the session JSON `meta` and so in all
-later exports from that session. Use `comparability()` in
+Every `display_*` field lands in the session JSON `meta`; the pooled CSV
+exports the main comparability subset (gamma, refresh Hz, ambient,
+brightness %, night-mode). Use `comparability()` in
 `calibration.py` to flag gamma / refresh / ambient / black-white
 mismatches before pooling data. Values are estimates + settings, not
 photometry — no absolute cd/m².
@@ -97,9 +107,11 @@ results vs past sessions" reopens any historic session. Every test writes a
 stable `kind` id into its JSON summary so scores stay comparable.
 
 Set an optional integer seed in the GUI for exact replay (blank = random;
-a non-integer seed warns and falls back to random). Trials are clamped to
-1-200; tiny counts warn that the staircase will truncate before
-converging. Session files over 10MB are skipped by the norms loader.
+a non-integer seed warns, falls back to random, and is logged as
+`seed_input_invalid`). Trials are clamped to
+1-200 (GUI spinbox offers 20-80); tiny counts warn that the staircase
+will truncate before converging. Session files over 10MB are skipped
+by the norms loader.
 Display calibration is saved to `visual_test/data/display_profile.json` and
 reloaded on start.
 
@@ -116,14 +128,17 @@ python3 -m visual_test.export --report visual_test/data/sessions/<session>.json
 The session list is scrollable; tick "Include legacy archive" to browse
 read-only legacy sessions alongside current ones. Each session ranks
 against its own directory (current vs current, legacy vs legacy), so
-legacy schema differences can't skew current ranks.
+legacy schema differences can't skew current ranks. (`--summary
+--include-archive` pools both dirs into one aggregate table; `--report`
+always ranks against the session's own directory and warns if
+`--data-dir` points elsewhere.)
 
 All results are experimental playground estimates, not clinical measures.
 
 ## Dev
 
 ```bash
-python3 -m pytest visual_test/ -q  # full suite (headless; Tkinter not required)
+python3 -m pytest visual_test/ -q  # full suite (needs python3-tk installed; main.py imports Tkinter at collection)
 python3 -m mypy visual_test/       # type check (config in pyproject.toml)
 python3 -m ruff check visual_test/ # lint (config in pyproject.toml)
 ```

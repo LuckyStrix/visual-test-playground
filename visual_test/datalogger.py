@@ -177,8 +177,10 @@ class DataLogger:
         self.trials.append(rec)
         try:
             self._write_json()
-        except Exception:
-            pass
+        except Exception as e:
+            import warnings
+
+            warnings.warn(f"log_trial: JSON snapshot failed ({e}); CSV is ahead", stacklevel=2)
 
     def end_test(self, **summary):
         if not isinstance(summary.get("test"), str) or not summary.get("test"):
