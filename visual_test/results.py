@@ -107,6 +107,7 @@ TEST_INFO = {
     },
 }
 
+
 def flags_for(summary):
     """Short caveat strings: aborted, truncated, unreliable bias, clipped."""
     out = []
@@ -138,7 +139,6 @@ def _norm_sentence(kind, display, percentile, band, n, z):
     if z is not None:
         beat += f" (z {z:+.1f}; + means better)"
     return f"{base} {beat} {band}."
-
 
 
 def interpret(card):

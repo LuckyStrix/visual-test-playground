@@ -32,8 +32,13 @@ SOUND_SPECS = {
 }
 
 _AVATAR_COLORS = [
-    (46, 125, 50), (21, 101, 192), (123, 31, 162), (239, 108, 0),
-    (0, 131, 143), (198, 40, 40), (69, 90, 100),
+    (46, 125, 50),
+    (21, 101, 192),
+    (123, 31, 162),
+    (239, 108, 0),
+    (0, 131, 143),
+    (198, 40, 40),
+    (69, 90, 100),
 ]
 
 
@@ -104,8 +109,7 @@ def _write_avatar(path, seed=0, size=64):
         cx0 = size // 2
         d.ellipse([cx0 - 10, cx0 - 14, cx0 + 10, cx0 + 6], fill=(245, 245, 245))
         d.ellipse([cx0 - 4, cx0 - 10, cx0 + 4, cx0 - 2], fill=(20, 20, 20))
-        d.arc([cx0 - 14, cx0 - 2, cx0 + 14, cx0 + 16], 20, 160,
-              fill=(245, 245, 245), width=3)
+        d.arc([cx0 - 14, cx0 - 2, cx0 + 14, cx0 + 16], 20, 160, fill=(245, 245, 245), width=3)
         tmp = path + ".tmp"
         img.save(tmp)
         os.replace(tmp, path)
@@ -163,6 +167,7 @@ def _img_ok(path):
         if Image is None:
             return True
         from PIL import Image as _I
+
         with _I.open(path) as im:
             im.verify()
         return True
@@ -210,6 +215,7 @@ def _find_player():
     global _PLAYER
     if _PLAYER is None:
         import shutil
+
         for cmd in (["aplay", "-q"], ["paplay"], ["afplay"]):
             if shutil.which(cmd[0]):
                 _PLAYER = cmd
@@ -222,6 +228,7 @@ def _find_player():
 def _play_sync(path):
     try:
         import winsound
+
         winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
         return True
     except ImportError:
@@ -229,12 +236,17 @@ def _play_sync(path):
     except Exception:
         return False
     import subprocess
+
     cmd = _find_player()
     if not cmd:
         return False
     try:
-        proc = subprocess.Popen([*cmd, path], stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+        proc = subprocess.Popen(
+            [*cmd, path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+        )
     except Exception:
         return False
     try:
@@ -273,6 +285,7 @@ def play_sound(name, widget=None):
 def _can_play():
     try:
         import importlib.util
+
         if importlib.util.find_spec("winsound") is not None:
             return True
     except Exception:
@@ -346,6 +359,7 @@ def avatar_path(index=0):
 def photo_image(path, size=None):
     try:
         from PIL import Image as _I
+
         try:
             from PIL import ImageTk as _Tk
         except ImportError:

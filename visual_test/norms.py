@@ -127,11 +127,11 @@ def extract(kind, summary):
 
 def load_session(path):
     try:
-        if not isinstance(path, str) or not path.endswith('.json'):
+        if not isinstance(path, str) or not path.endswith(".json"):
             return None
         if os.path.getsize(path) > 10 * 1024 * 1024:
             return None
-        with open(path, encoding='utf-8') as f:
+        with open(path, encoding="utf-8") as f:
             doc = json.load(f)
     except (OSError, ValueError):
         return None

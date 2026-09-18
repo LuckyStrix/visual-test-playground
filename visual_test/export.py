@@ -49,7 +49,7 @@ def pooled_rows(data_dir, include_archive=False):
                     continue
                 kind = s.get("kind") or N.kind_of(s.get("test", ""))
                 got = N.extract(kind, s) if kind else None
-                if got is None:
+                if got is None and not (s.get("aborted") or s.get("truncated")):
                     continue
                 rows.append(
                     {
@@ -57,17 +57,17 @@ def pooled_rows(data_dir, include_archive=False):
                         "participant": participant,
                         "session": session,
                         "kind": kind,
-                    "test": s.get("test", ""),
-                    "value": got["value"],
-                    "display": got["display"],
-                    "n_trials": s.get("n_trials", ""),
-                    "aborted": bool(s.get("aborted", False)),
-                    "truncated": bool(s.get("truncated", False)),
-                    "hit_rate": s.get("hit_rate", ""),
-                    "fa_rate": s.get("fa_rate", ""),
-                    "d_prime": s.get("d_prime", ""),
-                }
-            )
+                        "test": s.get("test", ""),
+                        "value": got["value"] if got else "",
+                        "display": got["display"] if got else "",
+                        "n_trials": s.get("n_trials", ""),
+                        "aborted": bool(s.get("aborted", False)),
+                        "truncated": bool(s.get("truncated", False)),
+                        "hit_rate": s.get("hit_rate", ""),
+                        "fa_rate": s.get("fa_rate", ""),
+                        "d_prime": s.get("d_prime", ""),
+                    }
+                )
     return rows
 
 
@@ -141,8 +141,11 @@ def main(argv=None):
     ap.add_argument("--pooled", metavar="OUT.csv", help="write pooled per-test CSV")
     ap.add_argument("--summary", action="store_true", help="print per-kind norm summary")
     ap.add_argument("--report", metavar="SESSION.json", help="print a session report")
-    ap.add_argument("--include-archive", action="store_true",
-                    help="include data/legacy_archive in --list/--pooled")
+    ap.add_argument(
+        "--include-archive",
+        action="store_true",
+        help="include data/legacy_archive in --list/--pooled",
+    )
     args = ap.parse_args(argv)
     if args.list:
         return cmd_list(args.data_dir, args.include_archive)

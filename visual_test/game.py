@@ -6,6 +6,7 @@ thresholds stay comparable. Persistence lives in
 visual_test/data/game_<participant>.json, separate from session JSON so
 norms stay pure.
 """
+
 import json
 import math
 import os
@@ -20,7 +21,10 @@ except ImportError:
 XP_PER_TEST = 100
 XP_PER_LEVEL = 500
 MAX_LEVEL = 10
-FULL_BATTERY_N = 13
+FULL_BATTERY_N = 10
+
+MAX_STORED_XP = 10**12
+MAX_JSON_BYTES = 10 * 1024 * 1024
 
 BADGES = {
     "top10": "Top 10% finish",
@@ -49,7 +53,8 @@ def xp_into_level(xp):
     if lvl >= MAX_LEVEL:
         return lvl, 0, 0
     base = lvl * XP_PER_LEVEL
-    return lvl, xp - base, XP_PER_LEVEL
+    need = XP_PER_LEVEL
+    return lvl, xp - base, need
 
 
 def _num(v):
@@ -102,15 +107,16 @@ def badges_for_session(cards, calibrated=False):
     except TypeError:
         items = []
     cards = [c for c in items if isinstance(c, dict)]
-    scored = [c for c in cards
-              if c.get("display") is not None and c.get("value") is not None]
+    scored = [c for c in cards if c.get("display") is not None and c.get("value") is not None]
     try:
         calibrated = bool(calibrated)
     except Exception:
         calibrated = False
+
     def _pct(card):
         p = _num(card.get("percentile"))
         return p if p is not None else -1
+
     if any(_pct(c) >= 90 for c in scored):
         out.append("top10")
     for c in scored:
@@ -160,9 +166,6 @@ def profile_path(participant, data_dir):
     return os.path.join(root, f"game_{_safe_participant(participant)}.json")
 
 
-MAX_STORED_XP = 10 ** 12
-
-
 def _coerce_int(v):
     try:
         return max(0, min(int(float(v)), MAX_STORED_XP))
@@ -197,9 +200,13 @@ def _coerce_profile(doc, participant):
     clean = []
     for h in hist:
         if isinstance(h, dict):
-            clean.append({"session": h.get("session"),
-                          "xp": _coerce_int(h.get("xp", 0)),
-                          "utc": h.get("utc")})
+            clean.append(
+                {
+                    "session": h.get("session"),
+                    "xp": _coerce_int(h.get("xp", 0)),
+                    "utc": h.get("utc"),
+                }
+            )
     doc["history"] = clean[-50:]
     if not isinstance(doc.get("last_session_utc"), str):
         doc["last_session_utc"] = None
@@ -210,36 +217,63 @@ def load_profile(participant, data_dir):
     name = _safe_participant(participant)
     try:
         path = profile_path(name, data_dir)
-    except Exception:
-        return {"participant": name, "xp": 0, "badges": [],
-                "sessions": 0, "last_session_utc": None, "history": []}
+    except (OSError, ValueError, TypeError):
+        return {
+            "participant": name,
+            "xp": 0,
+            "badges": [],
+            "sessions": 0,
+            "last_session_utc": None,
+            "history": [],
+        }
     try:
-        with open(path) as f:
+        if os.path.getsize(path) > MAX_JSON_BYTES:
+            raise ValueError("profile too large")
+        with open(path, encoding="utf-8") as f:
             doc = json.load(f)
         if isinstance(doc, dict):
             return _coerce_profile(doc, name)
-    except Exception:
+    except (OSError, ValueError):
         pass
-    return {"participant": name, "xp": 0, "badges": [],
-            "sessions": 0, "last_session_utc": None, "history": []}
+    return {
+        "participant": name,
+        "xp": 0,
+        "badges": [],
+        "sessions": 0,
+        "last_session_utc": None,
+        "history": [],
+    }
+
+
+_PROFILE_LOCK = threading.Lock()
 
 
 def save_profile(participant, data_dir, profile):
     try:
         path = profile_path(participant, data_dir)
-    except Exception:
+    except (OSError, ValueError, TypeError):
         return None
     tmp = path + ".tmp"
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(tmp, "w") as f:
-            json.dump(profile, f, indent=2)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(profile, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            return None
         os.replace(tmp, path)
-    except Exception:
+    except (OSError, ValueError, TypeError):
         try:
             if os.path.exists(tmp):
                 os.remove(tmp)
-        except Exception:
+        except OSError:
             pass
         return None
     return path
@@ -334,33 +368,35 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
         items = list(cards or [])
     except TypeError:
         items = []
-    cards = [c for c in items if isinstance(c, dict)
-             and c.get("display") is not None and c.get("value") is not None]
+    cards = [
+        c
+        for c in items
+        if isinstance(c, dict) and c.get("display") is not None and c.get("value") is not None
+    ]
     if not cards:
         raise ValueError("no scored tests; skipping XP")
     name = _safe_participant(participant)
-    prof = load_profile(name, data_dir)
-    seen = {h.get("session") for h in (prof.get("history") or [])
-            if isinstance(h, dict)}
-    if session_id is not None and session_id in seen:
-        return prof, 0, [], False
-    old_level = level_for_xp(prof.get("xp", 0))
-    old_badges = set(prof.get("badges") or [])
-    rewards = summarize_rewards(cards, calibrated=calibrated)
-    gained = int(rewards["xp"])
-    prof["xp"] = _safe_xp(prof.get("xp", 0)) + gained
-    prof["sessions"] = _coerce_int(prof.get("sessions", 0)) + 1
-    prof["last_session_utc"] = datetime.now(timezone.utc).isoformat()
-    new_badges = [b for b in rewards["badges"] if b not in old_badges]
-    prof["badges"] = sorted(old_badges | set(rewards["badges"]))
     try:
-        sid = str(session_id)[:64] if session_id is not None else None
+        sid = str(session_id)[:64] if session_id is not None else "unidentified"
     except Exception:
-        sid = None
-    hist = prof.get("history") or []
-    hist.append({"session": sid, "xp": gained,
-                 "utc": prof["last_session_utc"]})
-    prof["history"] = hist[-50:]
-    save_profile(name, data_dir, prof)
+        sid = "unidentified"
+    with _PROFILE_LOCK:
+        prof = load_profile(name, data_dir)
+        seen = {h.get("session") for h in (prof.get("history") or []) if isinstance(h, dict)}
+        if sid in seen:
+            return prof, 0, [], False
+        old_level = level_for_xp(prof.get("xp", 0))
+        old_badges = set(prof.get("badges") or [])
+        rewards = summarize_rewards(cards, calibrated=calibrated)
+        gained = int(rewards["xp"])
+        prof["xp"] = _safe_xp(prof.get("xp", 0)) + gained
+        prof["sessions"] = _coerce_int(prof.get("sessions", 0)) + 1
+        prof["last_session_utc"] = datetime.now(timezone.utc).isoformat()
+        new_badges = [b for b in rewards["badges"] if b not in old_badges]
+        prof["badges"] = sorted(old_badges | set(rewards["badges"]))
+        hist = prof.get("history") or []
+        hist.append({"session": sid, "xp": gained, "utc": prof["last_session_utc"]})
+        prof["history"] = hist[-50:]
+        save_profile(name, data_dir, prof)
     new_level = level_for_xp(prof["xp"])
     return prof, gained, new_badges, new_level > old_level

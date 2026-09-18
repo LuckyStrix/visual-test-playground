@@ -4,17 +4,18 @@ version = "0.1.0"
 description = "EXPERIMENTAL playground for trying new things with AI models - NOT for real use (Tkinter + Pillow)"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.24",
-    "pillow>=10.0",
-    "scipy>=1.10",
-    "matplotlib>=3.6",
+    "numpy>=1.26.4",
+    "pillow>=12.2.0",
+    "scipy>=1.17.1",
+    "matplotlib>=3.6.3",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0", "ruff>=0.1", "mypy>=1.0"]
+test = ["pytest>=7.2.1", "ruff>=0.16.8", "mypy>=1.0.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["visual_test"]
+python_files = ["test_*.py"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -30,4 +31,4 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "W"]
+select = ["E", "F", "W", "B", "I", "UP"]

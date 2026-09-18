@@ -1,4 +1,5 @@
 """Deterministic convergence + validation checks for Staircase."""
+
 import math
 
 import pytest
@@ -8,8 +9,15 @@ from .staircase import Staircase
 
 def test_converges_near_target():
     thr_true = -1.0
-    stair = Staircase(start_val=-0.2, step_sizes=[0.4, 0.2, 0.1, 0.05], n_reversals=6,
-                      min_val=-4.0, max_val=0.0, rule='3D1U', n_trials_max=200)
+    stair = Staircase(
+        start_val=-0.2,
+        step_sizes=[0.4, 0.2, 0.1, 0.05],
+        n_reversals=6,
+        min_val=-4.0,
+        max_val=0.0,
+        rule="3D1U",
+        n_trials_max=200,
+    )
     while True:
         p = 1.0 / (1.0 + math.exp(-8.0 * (stair.current - thr_true)))
         _, done = stair.respond(p > 0.5)
@@ -25,13 +33,16 @@ def test_no_false_reversals_at_bound():
     assert s.reversals == []
 
 
-@pytest.mark.parametrize("kwargs", [
-    dict(rule='9D9U'),
-    dict(step_sizes=[]),
-    dict(step_sizes=[0.1, 0, -0.1]),
-    dict(n_reversals=0),
-    dict(n_trials_max=0),
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        dict(rule="9D9U"),
+        dict(step_sizes=[]),
+        dict(step_sizes=[0.1, 0, -0.1]),
+        dict(n_reversals=0),
+        dict(n_trials_max=0),
+    ],
+)
 def test_rejects_bad_params(kwargs):
     base = dict(start_val=0, step_sizes=[0.1])
     base.update(kwargs)

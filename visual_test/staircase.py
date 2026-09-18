@@ -1,20 +1,28 @@
 """Transformed up-down staircases (Levitt, 1971) operating in log units."""
+
 import warnings
 
 import numpy as np
 
-
 RULES = {
-    '1U1D': (1, 1, 0.500),
-    '2D1U': (1, 2, 0.707),
-    '3D1U': (1, 3, 0.794),
-    '4D1U': (1, 4, 0.841),
+    "1U1D": (1, 1, 0.500),
+    "2D1U": (1, 2, 0.707),
+    "3D1U": (1, 3, 0.794),
+    "4D1U": (1, 4, 0.841),
 }
 
 
 class Staircase:
-    def __init__(self, start_val, step_sizes, n_reversals=8, n_trials_max=60,
-                 min_val=-3.0, max_val=0.0, rule='3D1U'):
+    def __init__(
+        self,
+        start_val,
+        step_sizes,
+        n_reversals=8,
+        n_trials_max=60,
+        min_val=-3.0,
+        max_val=0.0,
+        rule="3D1U",
+    ):
         if rule not in RULES:
             raise ValueError(f"rule must be one of {list(RULES)}, got {rule}")
         if not step_sizes:
@@ -38,7 +46,9 @@ class Staircase:
         if self.start_val != start_val:
             warnings.warn(
                 f"start_val ({start_val}) outside [{min_val}, {max_val}]; "
-                f"clamped to {self.start_val}")
+                f"clamped to {self.start_val}",
+                stacklevel=2,
+            )
         self.current = self.start_val
         self.step_index = 0
         self.reversals = []
@@ -78,16 +88,16 @@ class Staircase:
             self.n_consec_correct = 0
         move = None
         if self.n_consec_incorrect >= self.n_up:
-            move = 'up'
+            move = "up"
             self.n_consec_correct = 0
             self.n_consec_incorrect = 0
         elif self.n_consec_correct >= self.n_down:
-            move = 'down'
+            move = "down"
             self.n_consec_correct = 0
             self.n_consec_incorrect = 0
         if move is not None:
             step = self._step()
-            if move == 'up':
+            if move == "up":
                 new_val = min(self.current + step, self.max_val)
             else:
                 new_val = max(self.current - step, self.min_val)
@@ -95,8 +105,9 @@ class Staircase:
                 self.direction = None
                 self.n_consec_correct = 0
                 self.n_consec_incorrect = 0
-                finished = (len(self.reversals) >= self.n_reversals
-                            or self.trial_num >= self.n_trials_max)
+                finished = (
+                    len(self.reversals) >= self.n_reversals or self.trial_num >= self.n_trials_max
+                )
                 return self.current, finished
             if self.direction is not None and move != self.direction:
                 self.reversals.append(self.current)
@@ -105,8 +116,7 @@ class Staircase:
                     self.step_index += 1
             self.direction = move
             self.current = new_val
-        finished = (len(self.reversals) >= self.n_reversals
-                    or self.trial_num >= self.n_trials_max)
+        finished = len(self.reversals) >= self.n_reversals or self.trial_num >= self.n_trials_max
         return self.current, finished
 
     def threshold(self, n_discard=2):
@@ -117,5 +127,5 @@ class Staircase:
 
     def reversal_sd(self, n_discard=2):
         if len(self.reversals) <= n_discard + 1:
-            return float('nan')
+            return float("nan")
         return float(np.std(self.reversals[n_discard:], ddof=1))

@@ -3,15 +3,18 @@
 All luminances in 0-255 sRGB gray, background 128. Sizes derived from
 pixels-per-degree so results are comparable across displays.
 """
+
 import math
+
 import numpy as np
 from PIL import Image
 
 BG = 128
 
 
-def gabor_patch(size_px, ppd, sf_cpd, contrast, orientation_deg=0.0,
-                phase_deg=90.0, sigma_deg=0.8, bg=BG):
+def gabor_patch(
+    size_px, ppd, sf_cpd, contrast, orientation_deg=0.0, phase_deg=90.0, sigma_deg=0.8, bg=BG
+):
     size_px = int(size_px)
     sf_cpp = sf_cpd / ppd
     sigma_px = max(2.0, sigma_deg * ppd)
@@ -21,18 +24,17 @@ def gabor_patch(size_px, ppd, sf_cpd, contrast, orientation_deg=0.0,
     xr = x * math.cos(theta) + y * math.sin(theta)
     yr = -x * math.sin(theta) + y * math.cos(theta)
     carrier = np.sin(2 * math.pi * sf_cpp * xr + math.radians(phase_deg))
-    env = np.exp(-(xr ** 2 + yr ** 2) / (2 * sigma_px ** 2))
+    env = np.exp(-(xr**2 + yr**2) / (2 * sigma_px**2))
     lum = bg + contrast * (127.0) * carrier * env
     lum = np.clip(lum, 0, 255)
     arr = np.clip(np.round(lum), 0, 255).astype(np.uint8)
-    return Image.fromarray(arr).convert('RGB')
+    return Image.fromarray(arr).convert("RGB")
 
 
 def blank_patch(size_px, bg=BG):
     size_px = int(size_px)
     arr = np.full((size_px, size_px, 3), bg, dtype=np.uint8)
-    return Image.fromarray(arr).convert('RGB')
-    return Image.fromarray(arr)
+    return Image.fromarray(arr).convert("RGB")
 
 
 def landolt_c(size_px, gap_dir_deg, stroke_px=None, fg=10, bg=235):
@@ -55,11 +57,11 @@ def landolt_c(size_px, gap_dir_deg, stroke_px=None, fg=10, bg=235):
     ring = (r <= r_out) & (r >= r_in) & (d_ang >= gap_half)
     arr = np.full((s, s), bg, dtype=np.uint8)
     arr[ring] = fg
-    return Image.fromarray(arr).convert('RGB')
+    return Image.fromarray(arr).convert("RGB")
 
 
 def acuity_size_px(logmar, ppd):
-    mar_arcmin = 10 ** logmar
+    mar_arcmin = 10**logmar
     outer_diam_arcmin = 5 * mar_arcmin
     return max(7, outer_diam_arcmin / 60 * ppd)
 
@@ -68,11 +70,11 @@ def _clip(v):
     return int(max(0, min(255, round(v))))
 
 
-def isoluminant_pair(delta, axis='rg', lum=128):
-    if axis == 'rg':
+def isoluminant_pair(delta, axis="rg", lum=128):
+    if axis == "rg":
         c1 = (_clip(lum + delta), _clip(lum - delta * 0.5), _clip(lum))
         c2 = (_clip(lum - delta), _clip(lum + delta * 0.5), _clip(lum))
-    elif axis == 'by':
+    elif axis == "by":
         c1 = (_clip(lum), _clip(lum), _clip(lum + delta))
         c2 = (_clip(lum), _clip(lum), _clip(lum - delta))
     else:
@@ -123,12 +125,6 @@ def red_blue_pair(delta, rng=None):
     return center, surround, False
 
 
-def tilted_grating(size_px, ppd, sf_cpd, contrast, tilt_deg, sigma_deg=0.8, bg=BG):
-    """Static oriented Gabor; tilt sign is the judgment (left vs right of vertical)."""
-    return gabor_patch(size_px, ppd, sf_cpd, contrast,
-                       orientation_deg=tilt_deg, phase_deg=90.0, sigma_deg=sigma_deg, bg=bg)
-
-
 def bright_disc(size_px, lum=255, bg=BG):
     s = int(size_px)
     yy, xx = np.mgrid[0:s, 0:s].astype(float)
@@ -137,9 +133,6 @@ def bright_disc(size_px, lum=255, bg=BG):
     arr = np.full((s, s, 3), bg, dtype=np.uint8)
     arr[r <= 1.0] = (_clip(lum), _clip(lum), _clip(lum))
     return Image.fromarray(arr)
-
-
-
 
 
 def brightness_pair(size_px, patch=128, patch_right=None, dark_ring=40, light_ring=220):
@@ -169,39 +162,10 @@ def vernier_bars(size_px, offset_px, lum=235, bg=BG):
     w, h, gap = max(3, s // 50), s // 3, max(4, s // 40)
     upper = (np.abs(xx - c) <= w // 2) & (yy >= c - gap - h) & (yy <= c - gap)
     off = int(round(offset_px))
-    lower = ((np.abs(xx - (c + off)) <= w // 2) & (yy >= c + gap)
-             & (yy <= c + gap + h))
+    lower = (np.abs(xx - (c + off)) <= w // 2) & (yy >= c + gap) & (yy <= c + gap + h)
     arr[upper] = (_clip(lum),) * 3
     arr[lower] = (_clip(lum),) * 3
     return Image.fromarray(arr)
-
-
-def dot_cloud(size_px, n, dot_r=5, lum=255, bg=BG, seed=None):
-    """N non-overlapping white dots. Judge: how many (1-9)?"""
-    rng = np.random.default_rng(seed)
-    s = int(size_px)
-    dot_r = min(dot_r, max(1, s // 8))
-    arr = np.full((s, s, 3), bg, dtype=np.uint8)
-    yy, xx = np.mgrid[0:s, 0:s].astype(float)
-    placed = []
-    for _ in range(int(n)):
-        for _try in range(60):
-            x, y = rng.uniform(dot_r * 2, s - dot_r * 2, 2)
-            if all(np.hypot(x - px, y - py) > dot_r * 3 for px, py in placed):
-                placed.append((x, y))
-                arr[np.hypot(xx - x, yy - y) <= dot_r] = (_clip(lum),) * 3
-                break
-        else:
-            x, y = rng.uniform(dot_r * 2, s - dot_r * 2, 2)
-            placed.append((x, y))
-            arr[np.hypot(xx - x, yy - y) <= dot_r] = (_clip(lum),) * 3
-    return Image.fromarray(arr)
-
-
-def hue_chips():
-    """Six hues (red orange yellow green blue purple) as RGB tuples."""
-    return [(228, 60, 60), (235, 140, 40), (235, 215, 60),
-            (90, 180, 90), (80, 130, 230), (150, 90, 200)]
 
 
 def size_pair(size_px, ref_diam, cmp_diam, lum=235, bg=BG):
@@ -246,10 +210,11 @@ def match_pair(total_w_px, patch_px, solid_level, check_px=2):
     vary the solid starting level across repetitions to reduce anchoring bias.
     """
     from PIL import Image as _I
+
     left = halftone_patch(patch_px, check_px=check_px)
     right = solid_patch(patch_px, (_clip(solid_level),) * 3)
     gap = max(8, patch_px // 8)
-    canvas = _I.new('RGB', (patch_px * 2 + gap, patch_px), (128, 128, 128))
+    canvas = _I.new("RGB", (patch_px * 2 + gap, patch_px), (128, 128, 128))
     canvas.paste(left, (0, 0))
     canvas.paste(right, (patch_px + gap, 0))
     return canvas
@@ -262,10 +227,11 @@ LIGHT_STEPS = (253, 251, 249, 247, 243, 239, 231, 223, 207)
 def step_row(patch_px, levels, bg, n_cols=9):
     """Row of `levels` gray patches on `bg` for black/white visibility."""
     from PIL import Image as _I
+
     patch_px, n_cols = int(patch_px), int(n_cols)
     gap = max(6, patch_px // 6)
     w = n_cols * patch_px + (n_cols - 1) * gap
-    canvas = _I.new('RGB', (w, patch_px), (bg, bg, bg))
+    canvas = _I.new("RGB", (w, patch_px), (bg, bg, bg))
     for i, lv in enumerate(list(levels)[:n_cols]):
         canvas.paste(solid_patch(patch_px, (_clip(lv),) * 3), (i * (patch_px + gap), 0))
     return canvas

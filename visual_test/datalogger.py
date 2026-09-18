@@ -1,4 +1,5 @@
 """Trial-by-trial logging with full provenance for psychophysics."""
+
 import csv
 import json
 import os
@@ -6,12 +7,12 @@ from datetime import datetime, timezone
 
 
 def safe_name(s):
-    keep = ''.join(c if (c.isalnum() or c in ('-', '_')) else '_' for c in (s or '').strip())
-    return keep.strip('_') or 'anon'
+    keep = "".join(c if (c.isalnum() or c in ("-", "_")) else "_" for c in (s or "").strip())
+    return keep.strip("_") or "anon"
 
 
 def _sanitize(v):
-    if isinstance(v, str) and v[:1] in ('=', '+', '-', '@'):
+    if isinstance(v, str) and v.strip()[:1] in ("=", "+", "-", "@"):
         return "'" + v
     return v
 
@@ -21,8 +22,7 @@ class DataLogger:
 
     def __init__(self, participant_id=None, data_dir=None, meta=None):
         if data_dir is None:
-            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                    'data', 'sessions')
+            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sessions")
         os.makedirs(data_dir, exist_ok=True)
         self.data_dir = data_dir
         self.meta = meta or {}
@@ -30,13 +30,13 @@ class DataLogger:
         self.tests = []
         self._f = None
         self._w = None
-        cleaned = safe_name(participant_id) if participant_id else ''
-        if not cleaned or cleaned == 'anon':
+        cleaned = safe_name(participant_id) if participant_id else ""
+        if not cleaned or cleaned == "anon":
             now = datetime.now(timezone.utc)
-            stamp = now.strftime('%Y%m%d_%H%M%S')
+            stamp = now.strftime("%Y%m%d_%H%M%S")
             cleaned = f"P{stamp}" if not participant_id else f"anon_{stamp}"
         self.participant_id = cleaned
-        self.session_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
+        self.session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         self._set_paths()
 
     def _set_paths(self):
@@ -59,19 +59,19 @@ class DataLogger:
                     pass
         else:
             self.save()
-        cleaned = safe_name(participant_id) if participant_id else ''
-        if not cleaned or cleaned == 'anon':
-            stamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
+        cleaned = safe_name(participant_id) if participant_id else ""
+        if not cleaned or cleaned == "anon":
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
             cleaned = f"P{stamp}" if not participant_id else f"anon_{stamp}"
         self.participant_id = cleaned
-        self.session_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
+        self.session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
         self._set_paths()
         self.trials = []
         self.tests = []
 
     def _open(self):
-        if self._f is None or getattr(self._f, 'closed', True):
-            self._f = open(self.csv_path, 'a', newline='', encoding='utf-8')
+        if self._f is None or getattr(self._f, "closed", True):
+            self._f = open(self.csv_path, "a", newline="", encoding="utf-8")
             self._w = None
 
     def _rewrite_with_fields(self, fields):
@@ -84,17 +84,17 @@ class DataLogger:
         self._w = None
         rows = []
         try:
-            with open(self.csv_path, 'r', newline='', encoding='utf-8') as rf:
+            with open(self.csv_path, newline="", encoding="utf-8") as rf:
                 rows = list(csv.DictReader(rf))
         except Exception:
             rows = []
-        tmp = self.csv_path + '.tmp'
+        tmp = self.csv_path + ".tmp"
         try:
-            with open(tmp, 'w', newline='', encoding='utf-8') as wf:
+            with open(tmp, "w", newline="", encoding="utf-8") as wf:
                 w = csv.DictWriter(wf, fieldnames=fields)
                 w.writeheader()
                 for r in rows:
-                    w.writerow({k: _sanitize(r.get(k, '')) for k in fields})
+                    w.writerow({k: _sanitize(r.get(k, "")) for k in fields})
                 wf.flush()
                 os.fsync(wf.fileno())
             os.replace(tmp, self.csv_path)
@@ -105,7 +105,7 @@ class DataLogger:
             except Exception:
                 pass
             raise
-        self._f = open(self.csv_path, 'a', newline='', encoding='utf-8')
+        self._f = open(self.csv_path, "a", newline="", encoding="utf-8")
         self._w = csv.DictWriter(self._f, fieldnames=fields)
 
     def _ensure(self, rec):
@@ -115,7 +115,7 @@ class DataLogger:
             try:
                 if self._f.tell() > 0:
                     self._f.flush()
-                    with open(self.csv_path, 'r', newline='', encoding='utf-8') as rf:
+                    with open(self.csv_path, newline="", encoding="utf-8") as rf:
                         existing = next(csv.reader(rf), [])
             except Exception:
                 existing = []
@@ -132,24 +132,37 @@ class DataLogger:
             self._rewrite_with_fields(fields)
 
     def _write_json(self):
-        tmp = self.json_path + '.tmp'
-        with open(tmp, 'w') as f:
-            json.dump({'schema': 2, 'app': 'visual_test',
-                       'participant': self.participant_id, 'session': self.session_id,
-                       'meta': self.meta, 'tests': self.tests,
-                       'trials_logged': len(self.trials)}, f, indent=2)
+        tmp = self.json_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(
+                {
+                    "schema": 2,
+                    "app": "visual_test",
+                    "participant": self.participant_id,
+                    "session": self.session_id,
+                    "meta": self.meta,
+                    "tests": self.tests,
+                    "trials_logged": len(self.trials),
+                },
+                f,
+                indent=2,
+            )
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, self.json_path)
 
     def log_trial(self, **rec):
-        rec = {'utc': datetime.now(timezone.utc).isoformat(),
-               'participant': self.participant_id, 'session': self.session_id, **rec}
-        rec.setdefault('rt_s', '')
+        rec = {
+            "utc": datetime.now(timezone.utc).isoformat(),
+            "participant": self.participant_id,
+            "session": self.session_id,
+            **rec,
+        }
+        rec.setdefault("rt_s", "")
         rec = {k: _sanitize(v) for k, v in rec.items()}
         try:
             self._ensure(rec)
-            self._w.writerow({k: rec.get(k, '') for k in self._w.fieldnames})
+            self._w.writerow({k: rec.get(k, "") for k in self._w.fieldnames})
             self._f.flush()
             os.fsync(self._f.fileno())
         except Exception:
@@ -168,9 +181,9 @@ class DataLogger:
             pass
 
     def end_test(self, **summary):
-        if not isinstance(summary.get('test'), str) or not summary.get('test'):
-            summary['test'] = 'unknown'
-        summary['utc_end'] = datetime.now(timezone.utc).isoformat()
+        if not isinstance(summary.get("test"), str) or not summary.get("test"):
+            summary["test"] = "unknown"
+        summary["utc_end"] = datetime.now(timezone.utc).isoformat()
         self.tests.append(summary)
         try:
             if self._f is not None and not self._f.closed:

@@ -12,6 +12,7 @@ Static single-display visual screening battery (Tkinter + Pillow).
 ```bash
 pip install -r requirements.txt      # from repo root; pinned versions
 # or: pip install -e .[test]
+# GUI needs Tkinter too: sudo apt install python3-tk  (Debian/Ubuntu)
 python3 -m visual_test.main       # GUI
 python3 -m pytest visual_test/ -q # headless checks
 ```
@@ -41,7 +42,7 @@ flagged `anticipatory` and retried as false starts.
 
 One `PARTICIPANT_SESSION_trials.csv` + `PARTICIPANT_SESSION.json` per
 session in `data/sessions/`, plus auto-saved `*_staircase.png` /
-`*_psychometric.png` plots in `data/plots/`. The JSON is rewritten
+`*_psychometric.png` plots in `data/sessions/plots/`. The JSON is rewritten
 after every trial, so a crash or abort still leaves trial rows plus a
 partial summary. `end_test` records ppd, rule, step sizes, reversals,
 reversal trial indices, a `truncated` flag when the trial budget

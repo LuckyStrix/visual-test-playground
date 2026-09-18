@@ -42,14 +42,14 @@ def session_report_text(path, data_dir):
 
 
 def _dirs_for(data_dir, include_archive):
-    import os
-
-    dirs = [data_dir]
-    if include_archive:
-        arch = os.path.join(os.path.dirname(os.path.abspath(data_dir)), "legacy_archive")
-        if os.path.isdir(arch) and os.path.abspath(arch) != os.path.abspath(data_dir):
-            dirs.append(arch)
-    return dirs
+    try:
+        try:
+            from .export import target_dirs
+        except ImportError:
+            from export import target_dirs  # type: ignore[no-redef]
+        return target_dirs(data_dir, include_archive)
+    except Exception:
+        return [data_dir]
 
 
 def _sessions_in(dirs):
@@ -106,8 +106,9 @@ def open_viewer(root, data_dir, tk_mod=None):
 
     ctrl = tk_mod.Frame(win)
     ctrl.pack(fill="x", padx=10)
-    tk_mod.Checkbutton(ctrl, text="Include legacy archive", variable=include_archive,
-                       command=lambda: refresh()).pack(side="left")
+    tk_mod.Checkbutton(
+        ctrl, text="Include legacy archive", variable=include_archive, command=lambda: refresh()
+    ).pack(side="left")
     tk_mod.Button(ctrl, text="Refresh", command=lambda: refresh()).pack(side="left", padx=6)
 
     body = tk_mod.Text(win, wrap="word", state="disabled")
@@ -180,6 +181,7 @@ def _bar(percentile, width=20, xp=None):
     except (TypeError, ValueError, OverflowError):
         pct = None
     import math as _math
+
     if pct is None or not _math.isfinite(pct):
         if xp:
             return f"(+{xp} XP; not enough past sessions to rank)"
@@ -219,11 +221,9 @@ def _card_text(card):
         n = 0
     band = c.get("band") or "unranked"
     if c.get("percentile") is not None:
-        lines.append(_bar(c["percentile"], xp=xp if xp else None)
-                     + f"  ({band}, n={n})")
+        lines.append(_bar(c["percentile"], xp=xp if xp else None) + f"  ({band}, n={n})")
     elif n > 0:
-        lines.append(f"(only {n} past session(s); need a few more to rank)"
-                     f"{xp_txt}")
+        lines.append(f"(only {n} past session(s); need a few more to rank){xp_txt}")
     else:
         lines.append(f"(no past sessions to compare against yet){xp_txt}")
     caveats = c.get("caveats", [])

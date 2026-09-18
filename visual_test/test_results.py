@@ -206,8 +206,13 @@ def test_export_archive_flag(tmp_path):
     sess = tmp_path / "sessions"
     _write_session(sess, "new.json", [{"kind": "contrast", "threshold_log": -1.0}])
     (arch / "old.json").write_text(
-        json.dumps({"participant": "O", "session": "S", "tests": [{"kind": "contrast",
-                    "threshold_log": -0.9}]})
+        json.dumps(
+            {
+                "participant": "O",
+                "session": "S",
+                "tests": [{"kind": "contrast", "threshold_log": -0.9}],
+            }
+        )
     )
     assert len(E.pooled_rows(str(sess))) == 1
     assert len(E.pooled_rows(str(sess), include_archive=True)) == 2
@@ -217,7 +222,10 @@ def test_export_archive_flag(tmp_path):
 def test_viewer_entry_marks_archive_source():
     from .viewer import _entry_text
 
-    assert _entry_text({"participant": "P", "session": "S", "n_tests": 2,
-                        "source": "sessions"}) == "P — S (2 tests)"
-    assert "[legacy_archive]" in _entry_text({"participant": "P", "session": "S",
-                                              "n_tests": 1, "source": "legacy_archive"})
+    assert (
+        _entry_text({"participant": "P", "session": "S", "n_tests": 2, "source": "sessions"})
+        == "P — S (2 tests)"
+    )
+    assert "[legacy_archive]" in _entry_text(
+        {"participant": "P", "session": "S", "n_tests": 1, "source": "legacy_archive"}
+    )
