@@ -133,6 +133,8 @@ def open_viewer(root, data_dir, tk_mod=None):
             render("That session is no longer listed — press Refresh.")
             return
         info = sessions[i]
+        # Norms come from the selected session's own directory, so legacy
+        # sessions rank against the archive only and never skew current ranks.
         own_dir = os.path.dirname(info["path"])
         got = interpret_session(info["path"], own_dir)
         if got is None:

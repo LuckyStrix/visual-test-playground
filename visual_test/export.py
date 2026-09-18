@@ -44,6 +44,7 @@ def pooled_rows(data_dir, include_archive=False):
             if doc is None:
                 continue
             participant, session = N.session_label(doc)
+            meta = doc.get("meta") if isinstance(doc.get("meta"), dict) else {}
             for s in doc.get("tests") or []:
                 if not isinstance(s, dict):
                     continue
@@ -61,11 +62,37 @@ def pooled_rows(data_dir, include_archive=False):
                         "value": got["value"] if got else "",
                         "display": got["display"] if got else "",
                         "n_trials": s.get("n_trials", ""),
+                        "n_reversals": s.get("n_reversals", ""),
+                        "reversals": ";".join(
+                            str(v) for v in (s.get("reversals") or [])
+                        ),
+                        "reversal_sd": s.get("reversal_sd", ""),
+                        "weibull_alpha": s.get("weibull_alpha", ""),
+                        "weibull_beta": s.get("weibull_beta", ""),
                         "aborted": bool(s.get("aborted", False)),
                         "truncated": bool(s.get("truncated", False)),
                         "hit_rate": s.get("hit_rate", ""),
                         "fa_rate": s.get("fa_rate", ""),
                         "d_prime": s.get("d_prime", ""),
+                        "ppd": s.get("ppd", meta.get("display_ppd", "")),
+                        "seed": s.get("seed", ""),
+                        "start_val": s.get("start_val", ""),
+                        "start_val_orig": s.get("start_val_orig", ""),
+                        "difficulty": s.get(
+                            "difficulty", meta.get("difficulty", "")
+                        ),
+                        "difficulty_adj": s.get(
+                            "difficulty_adj", meta.get("difficulty_adj", "")
+                        ),
+                        "display_gamma": meta.get("display_gamma_estimate", ""),
+                        "display_refresh_hz": meta.get("display_refresh_hz", ""),
+                        "display_ambient": meta.get("display_ambient", ""),
+                        "display_brightness_pct": meta.get(
+                            "display_brightness_pct", ""
+                        ),
+                        "display_night_mode_off": meta.get(
+                            "display_night_mode_off", ""
+                        ),
                     }
                 )
     return rows
@@ -95,11 +122,27 @@ def cmd_pooled(data_dir, out_path, include_archive=False):
         "value",
         "display",
         "n_trials",
+        "n_reversals",
+        "reversals",
+        "reversal_sd",
+        "weibull_alpha",
+        "weibull_beta",
         "aborted",
         "truncated",
         "hit_rate",
         "fa_rate",
         "d_prime",
+        "ppd",
+        "seed",
+        "start_val",
+        "start_val_orig",
+        "difficulty",
+        "difficulty_adj",
+        "display_gamma",
+        "display_refresh_hz",
+        "display_ambient",
+        "display_brightness_pct",
+        "display_night_mode_off",
     ]
     with open(out_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
@@ -109,13 +152,19 @@ def cmd_pooled(data_dir, out_path, include_archive=False):
     return 0
 
 
-def cmd_summary(data_dir):
-    group = N.collect_norms(data_dir)
+def cmd_summary(data_dir, include_archive=False):
+    group = {}
+    for d in target_dirs(data_dir, include_archive):
+        part = N.collect_norms(d)
+        for kind, vals in part.items():
+            group.setdefault(kind, []).extend(vals)
     if not group:
         print("no scorable sessions in", data_dir)
         return 0
     for kind in sorted(group):
         d = N.describe(group[kind])
+        if not d:
+            continue
         info = R.TEST_INFO.get(kind, {})
         title = info.get("title", kind)
         print(
@@ -144,7 +193,7 @@ def main(argv=None):
     ap.add_argument(
         "--include-archive",
         action="store_true",
-        help="include data/legacy_archive in --list/--pooled",
+        help="include data/legacy_archive in --list/--pooled/--summary",
     )
     args = ap.parse_args(argv)
     if args.list:
@@ -152,7 +201,7 @@ def main(argv=None):
     if args.pooled:
         return cmd_pooled(args.data_dir, args.pooled, args.include_archive)
     if args.summary:
-        return cmd_summary(args.data_dir)
+        return cmd_summary(args.data_dir, args.include_archive)
     if args.report:
         return cmd_report(args.data_dir, args.report)
     ap.print_help()

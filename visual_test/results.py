@@ -65,9 +65,12 @@ TEST_INFO = {
     "sizematch": {
         "title": "Size match bias",
         "what": "Left disc fixed, you resized the right disc until equal.",
-        "unit": "0% = veridical; signed % shows over/undershoot",
+        "unit": "0% = veridical; signed % shows over/undershoot (ranks use |bias|)",
         "good": "Bias near 0%.",
-        "checks": "Consistent overshoot suggests a context or strategy effect.",
+        "checks": (
+            "Consistent overshoot suggests a context or strategy effect. "
+            "Ranking compares absolute bias, so direction never helps a rank."
+        ),
     },
     "masked": {
         "title": "Masked Gabor detection",
@@ -123,6 +126,8 @@ def flags_for(summary):
         out.append("hit the 1-pixel display floor on some trials")
     if s.get("n_catch") == 0 and "d_prime" in s:
         out.append("no catch trials recorded; bias unchecked")
+    if "median_rt_s" in s and s.get("median_rt_s") is None:
+        out.append("no hits recorded (all misses/false starts); RT undefined")
 
     return out
 

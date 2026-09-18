@@ -16,6 +16,9 @@ import numpy as np
 
 MIN_N_FOR_PERCENTILE = 5
 
+# No current test scores higher-better: thresholds, RT, arcmin and |bias|
+# all rank lower as better. Keep the set (empty) so a future higher-better
+# test only needs adding its kind here.
 HIGHER_BETTER: frozenset = frozenset()
 
 GUI_LABEL_TO_KIND = {
@@ -43,10 +46,6 @@ NAME_TO_KIND = {
     "Size match bias": "sizematch",
     "Masked Gabor Y/N": "masked",
 }
-
-
-def _in_range(v, lo, hi):
-    return v is not None and lo <= v <= hi
 
 
 def kind_of(name):

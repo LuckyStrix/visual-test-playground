@@ -49,10 +49,6 @@ def compute_geometry(screen_width_px, screen_height_px, diag_in, viewing_dist_cm
     )
 
 
-def sf_cycles_per_px(sf_cpd, ppd):
-    return sf_cpd / ppd
-
-
 def nyquist_ok(sf_cpd, ppd):
     try:
         sf_cpd = float(sf_cpd)

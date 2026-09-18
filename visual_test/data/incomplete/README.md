@@ -1,5 +1,6 @@
-# incomplete — zero-byte CSVs from aborted sessions
+# incomplete — legacy audit dir
 
-No trials were logged before these sessions ended (window closed during
-practice/instructions, or the run never started). Kept for audit; safe
-to delete.
+Zero-byte CSVs from sessions that never logged a trial are removed on
+profile switch (`DataLogger.set_participant` cleans them up), so this
+directory normally stays empty. Old audit files may remain; safe to
+delete.

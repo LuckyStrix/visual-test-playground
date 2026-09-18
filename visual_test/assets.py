@@ -102,6 +102,7 @@ def _write_avatar(path, seed=0, size=64):
     except (TypeError, ValueError, OverflowError):
         slot = 0
     color = _AVATAR_COLORS[slot]
+    tmp = None
     try:
         img = Image.new("RGB", (size, size), (30, 30, 34))
         d = ImageDraw.Draw(img)
@@ -111,11 +112,11 @@ def _write_avatar(path, seed=0, size=64):
         d.ellipse([cx0 - 4, cx0 - 10, cx0 + 4, cx0 - 2], fill=(20, 20, 20))
         d.arc([cx0 - 14, cx0 - 2, cx0 + 14, cx0 + 16], 20, 160, fill=(245, 245, 245), width=3)
         tmp = path + ".tmp"
-        img.save(tmp)
+        img.save(tmp, "PNG")
         os.replace(tmp, path)
     except (OSError, ValueError):
         try:
-            if os.path.exists(tmp):
+            if tmp and os.path.exists(tmp):
                 os.remove(tmp)
         except Exception:
             pass
@@ -126,6 +127,7 @@ def _write_avatar(path, seed=0, size=64):
 def _write_badge(path, kind="star", size=48):
     if Image is None:
         return False
+    tmp = None
     try:
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
@@ -138,11 +140,11 @@ def _write_badge(path, kind="star", size=48):
             pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
         d.polygon(pts, fill=(255, 193, 7, 255), outline=(120, 70, 0, 255))
         tmp = path + ".tmp"
-        img.convert("RGB").save(tmp)
+        img.convert("RGB").save(tmp, "PNG")
         os.replace(tmp, path)
     except (OSError, ValueError):
         try:
-            if os.path.exists(tmp):
+            if tmp and os.path.exists(tmp):
                 os.remove(tmp)
         except Exception:
             pass
@@ -189,7 +191,7 @@ def ensure_assets():
         except OSError:
             pass
     try:
-        for i in range(4):
+        for i in range(len(_AVATAR_COLORS)):
             p = os.path.join(d, f"avatar_{i}.png")
             if not _img_ok(p):
                 _write_avatar(p, seed=i)
@@ -349,7 +351,7 @@ def mission_meta(kind):
 
 def avatar_path(index=0):
     try:
-        slot = int(index) % 4
+        slot = int(index) % len(_AVATAR_COLORS)
     except (TypeError, ValueError, OverflowError):
         slot = 0
     p = os.path.join(asset_dir(), f"avatar_{slot}.png")

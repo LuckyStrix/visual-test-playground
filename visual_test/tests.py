@@ -55,6 +55,34 @@ except ImportError:
     )
 
 
+def _save_fixed_plot(logger, name, kind, values, ylabel):
+    """Per-test plot for fixed-probe tasks (no staircase): values vs trial."""
+    try:
+        import os
+
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return
+    try:
+        stem = os.path.splitext(os.path.basename(logger.csv_path))[0]
+        plot_dir = os.path.join(logger.data_dir, "plots")
+        os.makedirs(plot_dir, exist_ok=True)
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(range(1, len(values) + 1), list(values), "o-", ms=4)
+        ax.set_xlabel("Trial")
+        ax.set_ylabel(ylabel)
+        ax.set_title(name)
+        ax.grid(alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(os.path.join(plot_dir, f"{stem}_{kind}_fixed.png"), dpi=140)
+        plt.close(fig)
+    except Exception:
+        pass
+
+
 class QuitExperiment(Exception):
     pass
 
@@ -196,34 +224,6 @@ def wait_ms(win, ms):
             raise RuntimeError(f"Stimulus window lost: {e}") from e
         time.sleep(0.005)
     return (time.perf_counter() - t0) * 1000
-
-
-END_KEYS = [
-    "1",
-    "2",
-    "Up",
-    "Down",
-    "Left",
-    "Right",
-    "space",
-    "Return",
-    "y",
-    "Y",
-    "n",
-    "N",
-    "r",
-    "R",
-    "b",
-    "B",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "Escape",
-]
 
 
 def center(canvas):
@@ -529,6 +529,10 @@ class Base:
             threshold_n_discard=2,
             truncated=truncated,
             seed=self.seed,
+            start_val=round(float(self.stair.start_val), 4),
+            start_val_orig=self.sp.get("start_val_orig", self.sp.get("start_val")),
+            difficulty=self.sp.get("difficulty", "normal"),
+            difficulty_adj=self.sp.get("difficulty_adj", 0.0),
         )
         self._save_plots(levels, corrects)
         cx, cy = center(canvas)
@@ -554,6 +558,7 @@ class Base:
             import warnings
 
             stem = os.path.splitext(os.path.basename(self.logger.csv_path))[0]
+            kind = getattr(self, "kind", None) or "test"
             plot_dir = os.path.join(self.logger.data_dir, "plots")
             os.makedirs(plot_dir, exist_ok=True)
             plot_staircase(
@@ -561,7 +566,7 @@ class Base:
                 list(self.stair.reversals),
                 reversal_trials=list(self.stair.reversal_trials),
                 title=self.name,
-                path=os.path.join(plot_dir, stem + "_staircase.png"),
+                path=os.path.join(plot_dir, f"{stem}_{kind}_staircase.png"),
             )
             if levels and corrects:
                 guess = getattr(self, "fit_guess", None)
@@ -577,7 +582,9 @@ class Base:
                     levels, [bool(c) for c in corrects], guess=guess, log_levels=log_like
                 )
                 plot_psychometric(
-                    fit, title=self.name, path=os.path.join(plot_dir, stem + "_psychometric.png")
+                    fit,
+                    title=self.name,
+                    path=os.path.join(plot_dir, f"{stem}_{kind}_psychometric.png"),
                 )
                 self.logger.tests[-1].update(weibull_alpha=fit["alpha"], weibull_beta=fit["beta"])
                 self.logger.save()
@@ -1065,6 +1072,7 @@ class SizeMatch:
                 kind=self.kind,
                 n_completed=len(biases),
                 n_trials=self.n_trials,
+                truncated=True,
                 ppd=self.ppd,
                 seed=self.seed,
             )
@@ -1075,9 +1083,13 @@ class SizeMatch:
             kind=self.kind,
             mean_bias=round(m, 4),
             n_trials=self.n_trials,
+            n_completed=len(biases),
+            n_practice=0,
+            truncated=len(biases) < self.n_trials,
             ppd=self.ppd,
             seed=self.seed,
         )
+        _save_fixed_plot(self.logger, self.name, self.kind, biases, "bias per trial")
         cx, cy = center(canvas)
         canvas.delete("all")
         canvas.create_text(
@@ -1336,6 +1348,8 @@ class StaticReactionTime:
                 n_miss=misses,
                 n_fa=fas,
                 n_trials=self.n_trials,
+                n_completed=trial_no,
+                truncated=True,
                 ppd=self.ppd,
                 seed=self.seed,
             )
@@ -1348,11 +1362,17 @@ class StaticReactionTime:
             kind=self.kind,
             median_rt_s=med_arg,
             n_trials=self.n_trials,
+            n_completed=trial_no,
+            n_practice=0,
+            truncated=trial_no < self.n_trials,
             n_miss=n_miss,
             n_hit=len(rts),
             n_fa=fas,
             ppd=self.ppd,
             seed=self.seed,
+        )
+        _save_fixed_plot(
+            self.logger, self.name, self.kind, [r * 1000.0 for r in rts], "RT per hit (ms)"
         )
         med_txt = f"{med * 1000:.0f} ms" if rts else "no hits"
         canvas.delete("all")

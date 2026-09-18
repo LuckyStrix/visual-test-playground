@@ -349,7 +349,7 @@ class VisualTestApp:
                 import hashlib
 
                 digest = hashlib.md5(self.logger.participant_id.encode("utf-8")).hexdigest()
-                ap = A.avatar_path(int(digest, 16) % 4)
+                ap = A.avatar_path(int(digest, 16))
                 if ap:
                     self.avatar_img = A.photo_image(ap, size=(40, 40))
                     if self.avatar_img is not None:
@@ -685,21 +685,28 @@ class VisualTestApp:
             dist = float(self.dist_var.get())
         except Exception:
             dist = 60.0
+        try:
+            difficulty = self.difficulty_var.get()
+        except Exception:
+            difficulty = "normal"
         self.logger.meta.update(
             display_ppd=round(ppd, 1),
             display_diag_in=diag,
             display_dist_cm=dist,
             screen_px=(self.root.winfo_screenwidth(), self.root.winfo_screenheight()),
+            difficulty=difficulty,
+            difficulty_adj=self.get_difficulty_adjustment(),
             **self.display_profile.as_meta(),
         )
 
         base = dict(n_trials=n, feedback=fb, practice_trials=3, seed=seed)
         sp = STAIR_DEFAULTS.get(kind)
+        difficulty = self.difficulty_var.get() if hasattr(self, "difficulty_var") else "normal"
+        difficulty_adj = self.get_difficulty_adjustment()
         if sp:
             # Create a copy to avoid modifying the original
             adjusted_sp = sp.copy()
             # Apply difficulty adjustment to start_val
-            difficulty_adj = self.get_difficulty_adjustment()
             original_start = adjusted_sp["start_val"]
             # Subtract because: easier = higher start_val
             new_start = original_start - difficulty_adj
@@ -710,6 +717,9 @@ class VisualTestApp:
             new_start = max(min_bound, min(max_bound, new_start))
 
             adjusted_sp["start_val"] = new_start
+            adjusted_sp["start_val_orig"] = original_start
+            adjusted_sp["difficulty"] = difficulty
+            adjusted_sp["difficulty_adj"] = difficulty_adj
         else:
             adjusted_sp = sp
 

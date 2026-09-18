@@ -53,8 +53,9 @@ counted as `n_practice` in the summary.
 
 Legacy exports from older schema versions live in
 `data/legacy_archive/` (read-only reference; column names differ).
-Zero-byte CSVs from aborted sessions are kept in
-`data/incomplete/` for audit.
+Zero-byte CSVs from sessions that never logged a trial are removed on
+profile switch (see `set_participant`); `data/incomplete/` is kept for
+legacy audit files only.
 
 Yes/no tasks (static_contrast, static_color, masked,
 brightness) exclude no-signal trials from the staircase and report
@@ -95,7 +96,10 @@ truncated runs are excluded from norms and flagged on the card. "View
 results vs past sessions" reopens any historic session. Every test writes a
 stable `kind` id into its JSON summary so scores stay comparable.
 
-Set an optional integer seed in the GUI for exact replay (blank = random).
+Set an optional integer seed in the GUI for exact replay (blank = random;
+a non-integer seed warns and falls back to random). Trials are clamped to
+1-200; tiny counts warn that the staircase will truncate before
+converging. Session files over 10MB are skipped by the norms loader.
 Display calibration is saved to `visual_test/data/display_profile.json` and
 reloaded on start.
 
@@ -110,8 +114,9 @@ python3 -m visual_test.export --report visual_test/data/sessions/<session>.json
 ```
 
 The session list is scrollable; tick "Include legacy archive" to browse
-read-only legacy sessions alongside current ones (norms only use the
-current directory, so legacy schema differences can't skew ranks).
+read-only legacy sessions alongside current ones. Each session ranks
+against its own directory (current vs current, legacy vs legacy), so
+legacy schema differences can't skew current ranks.
 
 All results are experimental playground estimates, not clinical measures.
 
