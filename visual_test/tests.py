@@ -582,7 +582,9 @@ class Base:
                     stats = getattr(self, "stats", None)
                     if stats is not None:
                         s = stats.summary()
-                        guess = s["fa_rate"] if s["fa_rate"] is not None else 0.0
+                        # Unknown FA (no catch trials) -> neutral 0.5 guess,
+                        # not 0.0 (which would assume perfect specificity).
+                        guess = s["fa_rate"] if s["fa_rate"] is not None else 0.5
                     else:
                         guess = 0.5
                 log_like = getattr(self, "fit_log_levels", True)
@@ -594,7 +596,12 @@ class Base:
                     title=self.name,
                     path=os.path.join(plot_dir, f"{stem}_{kind}_psychometric.png"),
                 )
-                self.logger.tests[-1].update(weibull_alpha=fit["alpha"], weibull_beta=fit["beta"])
+                self.logger.tests[-1].update(
+                    weibull_alpha=fit["alpha"],
+                    weibull_beta=fit["beta"],
+                    weibull_guess=fit["guess"],
+                    weibull_lapse=fit["lapse"],
+                )
                 self.logger.save()
         except Exception as e:
             warnings.warn(f"{self.name}: plot/fit skipped ({e})", stacklevel=2)
@@ -1168,6 +1175,7 @@ class MaskedGabor(_YesNoRunMixin, Base):
         fixation(canvas, cx, cy)
         if present:
             stim = gabor_patch(self.px, self.ppd, 2.0, contrast)
+            foil_seed = None
         else:
             foil_seed = int(self.np_rng.integers(2**31))
             stim = noise_mask(self.px, seed=foil_seed)
@@ -1202,6 +1210,7 @@ class MaskedGabor(_YesNoRunMixin, Base):
                 "dur_ms": dur,
                 "shown_ms": round(shown_ms, 1),
                 "mask_seed": mask_seed,
+                "foil_seed": foil_seed,
                 "mask_ms": round(mask_ms, 1),
                 "catch": catch,
             },

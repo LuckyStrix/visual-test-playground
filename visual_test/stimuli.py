@@ -107,14 +107,18 @@ def red_blue_pair(delta, rng=None):
     Isoluminance (0.299R+0.587G+0.114B) holds exactly before 0-255 clipping;
     delta is capped at 45.0 to stay in gamut at lum=128. Clipped extremes
     are only approximate.
-    Pass a numpy Generator as rng for reproducible polarity; defaults to
-    the global RNG for backwards compatibility."""
+    Pass a numpy Generator as rng for reproducible polarity; rng=None falls
+    back to the global RNG and is NOT replayable — pass an explicit rng."""
+    import warnings
+
     lum, b = 128, 128
     delta = min(delta, 45.0)
     if delta <= 0:
         grey = (_clip(lum), _clip(lum), _clip(b))
         return grey, grey, None
     k = 0.299 / 0.114
+    if rng is None:
+        warnings.warn("red_blue_pair called without rng; polarity not replayable", stacklevel=2)
     flip = rng.random() < 0.5 if rng is not None else np.random.rand() < 0.5
     if flip:
         center = (_clip(lum + delta), _clip(lum), _clip(b - delta * k))
@@ -180,7 +184,14 @@ def size_pair(size_px, ref_diam, cmp_diam, lum=235, bg=BG):
 
 
 def noise_mask(size_px, bg=BG, amp=90, seed=None):
-    """White-noise mask shown right after a brief Gabor."""
+    """White-noise mask shown right after a brief Gabor.
+
+    seed=None uses OS entropy and is NOT replayable; trial code must pass
+    an explicit seed (foil_seed / mask_seed) to keep sessions replayable."""
+    import warnings
+
+    if seed is None:
+        warnings.warn("noise_mask called without seed; output not replayable", stacklevel=2)
     rng = np.random.default_rng(seed)
     s = int(size_px)
     arr = rng.integers(bg - amp, bg + amp + 1, (s, s)).clip(0, 255).astype(np.uint8)

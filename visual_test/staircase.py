@@ -1,5 +1,6 @@
 """Transformed up-down staircases (Levitt, 1971) operating in log units."""
 
+import math
 import warnings
 
 import numpy as np
@@ -27,8 +28,11 @@ class Staircase:
             raise ValueError(f"rule must be one of {list(RULES)}, got {rule}")
         if not step_sizes:
             raise ValueError("step_sizes must be a non-empty sequence")
-        if any(not s > 0 for s in step_sizes):
-            raise ValueError("step_sizes must all be positive")
+        if any(not math.isfinite(s) or not s > 0 for s in step_sizes):
+            raise ValueError("step_sizes must all be finite and positive")
+        for label, v in (("min_val", min_val), ("max_val", max_val), ("start_val", start_val)):
+            if not math.isfinite(v):
+                raise ValueError(f"{label} must be finite, got {v!r}")
         if min_val > max_val:
             raise ValueError(f"min_val ({min_val}) must be <= max_val ({max_val})")
         if int(n_reversals) < 1:
@@ -76,6 +80,8 @@ class Staircase:
         return self.step_sizes[min(self.step_index, len(self.step_sizes) - 1)]
 
     def respond(self, correct):
+        if correct is None:
+            raise ValueError("respond() requires True/False, got None")
         correct = bool(correct)
         self.levels.append(self.current)
         self.responses.append(correct)
