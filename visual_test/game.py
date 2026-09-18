@@ -389,7 +389,7 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
         old_badges = set(prof.get("badges") or [])
         rewards = summarize_rewards(cards, calibrated=calibrated)
         gained = int(rewards["xp"])
-        prof["xp"] = _safe_xp(prof.get("xp", 0)) + gained
+        prof["xp"] = _safe_xp(_safe_xp(prof.get("xp", 0)) + gained)
         prof["sessions"] = _coerce_int(prof.get("sessions", 0)) + 1
         prof["last_session_utc"] = datetime.now(timezone.utc).isoformat()
         new_badges = [b for b in rewards["badges"] if b not in old_badges]

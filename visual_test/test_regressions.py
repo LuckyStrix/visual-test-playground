@@ -183,3 +183,91 @@ def test_avatar_all_slots(tmp_path, monkeypatch):
     A.ensure_assets()
     for i in range(len(A._AVATAR_COLORS)):
         assert A.avatar_path(i) is not None
+
+
+class _ShimNp:
+    def __init__(self, vals=None, ints=None):
+        self.vals = list(vals if vals is not None else [0.5])
+        self.ints = list(ints if ints is not None else [7])
+
+    def random(self, *a, **k):
+        return self.vals.pop(0) if self.vals else 0.5
+
+    def integers(self, high, *a, **k):
+        return (self.ints.pop(0) if self.ints else 7) % high
+
+
+def _bullseye(tmp_path, vals):
+    lg = DataLogger("TEST", data_dir=str(tmp_path))
+    t = T.StaticColorBullseye(
+        "SB",
+        lg,
+        ppd=43.0,
+        staircase_params=_sp(1.5, 0.5, 2.0),
+        n_trials=2,
+        practice_trials=0,
+        seed=7,
+    )
+    t.np_rng = _ShimNp(vals=vals)
+    return t
+
+
+def test_bullseye_catch_ok_is_none(tmp_path, monkeypatch):
+    t = _bullseye(tmp_path, [0.05])
+    monkeypatch.setattr(T, "get_key", lambda w, valid, **k: ("r", 0.2))
+    ok, _rt, extra = t.trial(DummyCanvas(), DummyWin(), 1.5, True)
+    assert extra["catch"] is True
+    assert ok is None
+
+
+def test_static_color_logs_capped_delta(tmp_path, monkeypatch):
+    t = _bullseye(tmp_path, [0.5, 0.5])
+    monkeypatch.setattr(T, "get_key", lambda w, valid, **k: ("r", 0.2))
+    ok, _rt, extra = t.trial(DummyCanvas(), DummyWin(), 2.0, True)
+    assert extra["catch"] is False
+    assert extra["delta"] == 45.0
+    assert ok is not None
+
+
+def test_masked_gabor_mask_seeded_and_logged(tmp_path, monkeypatch):
+    def run(seed):
+        lg = DataLogger("TEST", data_dir=str(tmp_path))
+        t = T.MaskedGabor(
+            "M",
+            lg,
+            ppd=43.0,
+            staircase_params=_sp(-0.5, -3.0, 0.0),
+            n_trials=2,
+            practice_trials=0,
+            seed=seed,
+        )
+        monkeypatch.setattr(T, "get_key", lambda w, valid, **k: ("y", 0.25))
+        return t.trial(DummyCanvas(), DummyWin(), -0.5, True)
+
+    _ok1, _, ex1 = run(11)
+    _ok2, _, ex2 = run(11)
+    assert "mask_seed" in ex1
+    assert ex1["mask_seed"] == ex2["mask_seed"]
+    _, _, ex3 = run(12)
+    assert ex3["mask_seed"] != ex1["mask_seed"]
+
+
+def test_game_xp_clamped_at_max(tmp_path):
+    from . import game as G
+
+    p = G.profile_path("P1", str(tmp_path))
+    with open(p, "w") as f:
+        json.dump({"xp": G.MAX_STORED_XP - 50, "sessions": 1, "badges": [], "history": []}, f)
+    cards = [
+        {
+            "value": 1.0,
+            "display": "1%",
+            "percentile": 95.0,
+            "band": "Top 10%",
+            "z": 2.0,
+            "summary": {},
+        }
+    ]
+    prof, gained, _, _ = G.add_session("P1", str(tmp_path), cards, session_id="s1")
+    assert gained > 50
+    assert prof["xp"] == G.MAX_STORED_XP

@@ -876,7 +876,7 @@ class StaticColorBullseye(_YesNoRunMixin, Base):
         win.update()
         r, rt = get_key(win, ["r", "R", "b", "B"])
         said_redder = r.lower() == "r"
-        ok = (said_redder == truth) if truth is not None else False
+        ok = (said_redder == truth) if truth is not None else None
         if main and not catch and truth is not None:
             self.stats.note(present=bool(truth), said_yes=said_redder)
         if self.feedback and main and not catch:
@@ -886,7 +886,7 @@ class StaticColorBullseye(_YesNoRunMixin, Base):
             ok,
             rt,
             {
-                "delta": round(delta, 2),
+                "delta": round(min(delta, 45.0), 2),
                 "center": cent_col,
                 "surround": surr_col,
                 "center_redder": truth,
@@ -1175,7 +1175,8 @@ class MaskedGabor(_YesNoRunMixin, Base):
         win.update()
         shown_ms = wait_ms(win, dur)
         canvas.delete("all")
-        show_img(canvas, cx, cy, noise_mask(self.px))
+        mask_seed = int(self.np_rng.integers(2**31))
+        show_img(canvas, cx, cy, noise_mask(self.px, seed=mask_seed))
         win.update()
         mask_ms = wait_ms(win, 200)
         canvas.delete("all")
@@ -1200,6 +1201,7 @@ class MaskedGabor(_YesNoRunMixin, Base):
                 "present": present,
                 "dur_ms": dur,
                 "shown_ms": round(shown_ms, 1),
+                "mask_seed": mask_seed,
                 "mask_ms": round(mask_ms, 1),
                 "catch": catch,
             },

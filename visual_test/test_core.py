@@ -107,6 +107,9 @@ class ScriptedNpRng:
             return self.vals.pop(0)
         return 0.5
 
+    def integers(self, high, *a, **k):
+        return 7 % high
+
 
 def drive_seed(t, choices=None, np_vals=None, uniforms=None):
     t.rng = ScriptedRng(choices=choices, uniforms=uniforms)
