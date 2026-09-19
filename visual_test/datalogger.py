@@ -68,6 +68,7 @@ class DataLogger:
         self._set_paths()
         self.trials = []
         self.tests = []
+        self.meta = {}
 
     def _open(self):
         if self._f is None or getattr(self._f, "closed", True):
@@ -133,7 +134,7 @@ class DataLogger:
 
     def _write_json(self):
         tmp = self.json_path + ".tmp"
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "schema": 2,
@@ -153,10 +154,10 @@ class DataLogger:
 
     def log_trial(self, **rec):
         rec = {
+            **rec,
             "utc": datetime.now(timezone.utc).isoformat(),
             "participant": self.participant_id,
             "session": self.session_id,
-            **rec,
         }
         rec.setdefault("rt_s", "")
         rec = {k: _sanitize(v) for k, v in rec.items()}

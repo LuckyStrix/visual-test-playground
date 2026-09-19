@@ -55,7 +55,10 @@ def median_gamma(matched_levels):
 
 
 def parse_count_key(key):
-    k = int(key)
+    try:
+        k = int(key)
+    except (TypeError, ValueError):
+        raise ValueError("count must be an integer")
     if k < 0 or k > 9:
         raise ValueError("count must be 0..9")
     return k

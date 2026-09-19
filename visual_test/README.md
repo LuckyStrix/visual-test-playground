@@ -52,7 +52,9 @@ partial summary. `end_test` records ppd, rule, step sizes, reversals,
 reversal trial indices, reversal SD, a `truncated` flag when the trial budget
 expired before the reversal target, the `seed` plus `seed_base` /
 `seed_order` / interpreter versions, `difficulty` (per-test
-`difficulty_by_kind` in `meta`), trial counts (`n_trials` requested,
+`difficulty_by_kind` in `meta`), `difficulty_adj`, `start_val`,
+`start_val_orig`, `clipped_levels`, `target_p`, `threshold_n_discard`,
+`hit_rate`, `fa_rate`, `d_prime`, trial counts (`n_trials` requested,
 `n_completed`, `n_presented`, plus `n_attempts`/`n_retries` for RT), and the
 Weibull fit (`weibull_alpha/beta/guess/lapse/fit_failed`).
 Interrupted runs record `aborted: true` with an `abort_reason` instead
@@ -108,10 +110,10 @@ stable `kind` id into its JSON summary so scores stay comparable.
 
 Set an optional integer seed in the GUI for exact replay (blank = random;
 a non-integer seed warns, falls back to random, and is logged as
-`seed_input_invalid`). Trials are clamped to
-1-200 (GUI spinbox offers 20-80); tiny counts warn that the staircase
-will truncate before converging. Session files over 10MB are skipped
-by the norms loader.
+`seed_input_invalid`). Trials are clamped to 1-200 in the backend
+(`max(1,min(200,n))`), though the GUI spinbox only allows 20-80.
+Values outside 20-80 warn that the staircase may truncate before
+converging. Session files over 10MB are skipped by the norms loader.
 Display calibration is saved to `visual_test/data/display_profile.json` and
 reloaded on start.
 

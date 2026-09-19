@@ -14,6 +14,13 @@ RULES = {
 
 
 class Staircase:
+    """Transformed up-down staircase that tracks reversals and enforces bounds.
+    
+    The staircase starts at start_val and moves according to the rule (e.g., 3D1U).
+    Values are clamped to [min_val, max_val] with warnings when start_val is outside bounds.
+    The direction is reset to None when a bound is hit and the staircase would not move.
+    """
+
     def __init__(
         self,
         start_val,
@@ -80,6 +87,22 @@ class Staircase:
         return self.step_sizes[min(self.step_index, len(self.step_sizes) - 1)]
 
     def respond(self, correct):
+        """Process a trial result and update staircase state.
+        
+        Args:
+            correct: Boolean indicating if the trial was correct (True) or incorrect (False)
+            
+        Returns:
+            tuple: (current_level, finished) where:
+                - current_level: The current staircase level after processing
+                - finished: Boolean indicating if the staircase has reached
+                  n_reversals or n_trials_max
+                  
+        Side effects:
+            - Updates internal state (levels, responses, reversals, etc.)
+            - May append to reversals and reversal_trials when direction changes
+            - Resets direction to None when a bound is hit and no movement occurs
+        """
         if correct is None:
             raise ValueError("respond() requires True/False, got None")
         correct = bool(correct)
@@ -126,12 +149,38 @@ class Staircase:
         return self.current, finished
 
     def threshold(self, n_discard=2):
+        """Calculate the threshold estimate from reversals.
+        
+        Args:
+            n_discard: Number of initial reversals to discard (default: 2)
+            
+        Returns:
+            float: The mean of the reversals after discarding n_discard,
+                   or the current level if no reversals yet
+                   
+        Note:
+            If len(reversals) <= n_discard, returns the mean of all reversals
+            (no discard) rather than returning None or raising an error.
+        """
         if not self.reversals:
             return float(self.current)
         revs = self.reversals[n_discard:] if len(self.reversals) > n_discard else self.reversals
         return float(np.mean(revs))
 
     def reversal_sd(self, n_discard=2):
+        """Calculate the standard deviation of reversals.
+        
+        Args:
+            n_discard: Number of initial reversals to discard (default: 2)
+            
+        Returns:
+            float: The standard deviation of reversals after discarding n_discard,
+                   or NaN if insufficient reversals (len(reversals) <= n_discard + 1)
+                   
+        Note:
+            Returns NaN (not None) when there are too few reversals to compute
+            a meaningful standard deviation after discarding.
+        """
         if len(self.reversals) <= n_discard + 1:
             return float("nan")
         return float(np.std(self.reversals[n_discard:], ddof=1))

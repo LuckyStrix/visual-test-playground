@@ -50,6 +50,7 @@ def pooled_rows(data_dir, include_archive=False):
                     continue
                 kind = s.get("kind") or N.kind_of(s.get("test", ""))
                 got = N.extract(kind, s) if kind else None
+                extraction_failed = got is None and kind is not None and not (s.get("aborted") or s.get("truncated"))
                 if got is None and not (s.get("aborted") or s.get("truncated")):
                     continue
                 rows.append(
@@ -73,7 +74,7 @@ def pooled_rows(data_dir, include_archive=False):
                         "weibull_guess": s.get("weibull_guess", ""),
                         "weibull_lapse": s.get("weibull_lapse", ""),
                         "aborted": bool(s.get("aborted", False)),
-                        "truncated": bool(s.get("truncated", False)),
+                        "truncated": bool(s.get("truncated", "")),
                         "hit_rate": s.get("hit_rate", ""),
                         "fa_rate": s.get("fa_rate", ""),
                         "d_prime": s.get("d_prime", ""),
@@ -88,6 +89,11 @@ def pooled_rows(data_dir, include_archive=False):
                         "display_ambient": meta.get("display_ambient", ""),
                         "display_brightness_pct": meta.get("display_brightness_pct", ""),
                         "display_night_mode_off": meta.get("display_night_mode_off", ""),
+                        "n_completed": s.get("n_completed", ""),
+                        "n_presented": s.get("n_presented", ""),
+                        "n_attempts": s.get("n_attempts", ""),
+                        "n_retries": s.get("n_retries", ""),
+                        "extraction_failed": extraction_failed,
                     }
                 )
     return rows
@@ -141,6 +147,11 @@ def cmd_pooled(data_dir, out_path, include_archive=False):
         "display_ambient",
         "display_brightness_pct",
         "display_night_mode_off",
+        "n_completed",
+        "n_presented",
+        "n_attempts",
+        "n_retries",
+        "extraction_failed",
     ]
     tmp_path = out_path + ".tmp"
     with open(tmp_path, "w", newline="", encoding="utf-8") as f:

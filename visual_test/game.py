@@ -107,7 +107,14 @@ def badges_for_session(cards, calibrated=False):
     except TypeError:
         items = []
     cards = [c for c in items if isinstance(c, dict)]
-    scored = [c for c in cards if c.get("display") is not None and c.get("value") is not None]
+    scored = [
+        c
+        for c in cards
+        if c.get("display") is not None
+        and c.get("value") is not None
+        and not _card_summary(c).get("aborted")
+        and not _card_summary(c).get("truncated")
+    ]
     try:
         calibrated = bool(calibrated)
     except Exception:
@@ -237,7 +244,11 @@ def load_profile(participant, data_dir):
     except (OSError, ValueError) as e:
         try:
             if os.path.exists(path):
-                os.replace(path, path + ".corrupt")
+                backup = path + ".corrupt"
+                if os.path.exists(backup):
+                    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+                    backup = f"{path}.corrupt.{stamp}"
+                os.replace(path, backup)
         except OSError:
             pass
         import warnings
@@ -303,6 +314,15 @@ def _fallback_hold(k, handle):
             pass
 
 
+def _streak_key(handle):
+    if handle is None:
+        return None
+    try:
+        return (type(handle).__name__, id(handle))
+    except Exception:
+        return id(handle)
+
+
 def reset_streak(handle):
     if handle is None:
         return
@@ -312,7 +332,7 @@ def reset_streak(handle):
     except Exception:
         pass
     try:
-        k = id(handle)
+        k = _streak_key(handle)
         with _STREAK_LOCK:
             _FALLBACK_STREAKS[k] = 0
             _fallback_hold(k, handle)
@@ -332,7 +352,7 @@ def note_result(handle, ok):
     except Exception:
         pass
     try:
-        k = id(handle)
+        k = _streak_key(handle)
         with _STREAK_LOCK:
             if ok:
                 _FALLBACK_STREAKS[k] = int(_FALLBACK_STREAKS.get(k, 0)) + 1
@@ -355,7 +375,7 @@ def streak_of(handle):
         pass
     try:
         with _STREAK_LOCK:
-            return int(_FALLBACK_STREAKS.get(id(handle), 0))
+            return int(_FALLBACK_STREAKS.get(_streak_key(handle), 0))
     except Exception:
         return 0
 
@@ -390,6 +410,14 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
             sid = str(session_id)[:64]
     except Exception:
         sid = None
+    if sid is None:
+        import warnings
+
+        warnings.warn(
+            "add_session without session_id: replay protection unavailable, "
+            "this call always counts as a new session",
+            stacklevel=2,
+        )
     with _PROFILE_LOCK:
         prof = load_profile(name, data_dir)
         if sid is not None:
@@ -414,6 +442,9 @@ def add_session(participant, data_dir, cards, session_id=None, calibrated=False)
             }
         )
         prof["history"] = hist[-50:]
-        save_profile(name, data_dir, prof)
+        if save_profile(name, data_dir, prof) is None:
+            import warnings
+
+            warnings.warn("add_session: profile save failed; XP kept in memory only", stacklevel=2)
     new_level = level_for_xp(prof["xp"])
     return prof, gained, new_badges, new_level > old_level
